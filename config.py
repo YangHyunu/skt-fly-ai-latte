@@ -3,7 +3,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 from dotenv import load_dotenv
 
-from classes import ClovaSpeechClient, reminiscence_gpt, refine_gpt
+from classes import ClovaSpeechClient, reminiscence_gpt, refine_gpt, ElevenLabsClient, ReplicateClient, AzureBlobClient
 
 # .env 파일 로드
 load_dotenv()
@@ -19,6 +19,9 @@ class Settings:
         self.IMA_API_KEY = os.getenv('IMA_API_KEY')
         self.CLOVA_SPEECH_INVOKE_URL = os.getenv('CLOVA_SPEECH_INVOKE_URL')
         self.CLOVA_SPEECH_SECRET = os.getenv('CLOVA_SPEECH_SECRET')
+        self.ELEVENLABS_API_KEY = os.getenv('ELEVENLABS_API_KEY')
+        self.REPLICATE_API_TOKEN = os.getenv('REPLICATE_API_TOKEN')
+        self.REPLICATE_MODEL = os.getenv('REPLICATE_MODEL')
 
         # 클로바 클라이언트와 reminiscence_gpt 객체 초기화
         self.clova_client = None
@@ -47,6 +50,12 @@ class Settings:
         print(f"[INFO] reminiscence_gpt initialized.")
         self.refine = refine_gpt()
         print(f"[INFO] refine_gpt initialized.")
+        self.azure_client = AzureBlobClient()
+        print(f"[INFO] AzureBlobClient initialized.")
+        self.elevenlabs = ElevenLabsClient()
+        print(f"[INFO] ElevenLabsClient initialized.")
+        self.replicate = ReplicateClient()
+        print(f"[INFO] ReplicateClient initialized.")
 
 # 설정 객체를 전역으로 사용
 settings = Settings()

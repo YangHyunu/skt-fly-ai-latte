@@ -11,6 +11,15 @@ from fastapi import HTTPException
 import json
 import os
 from dotenv import load_dotenv
+from elevenlabs.client import ElevenLabs
+import replicate
+import base64
+import uuid
+from azure.storage.blob import BlobServiceClient, generate_blob_sas, BlobSasPermissions
+from app.models.image import ImageBase64Data
+from PIL import Image
+from io import BytesIO
+from datetime import datetime, timedelta, timezone
 
 # .env 파일 로드
 load_dotenv()
@@ -123,3 +132,94 @@ class refine_gpt:
     def make_midjourney_prompt(self, refine_story) -> str:
         midjourney_input = self.midjourney_chain.run({"context":refine_story})
         return midjourney_input
+
+class ElevenLabsClient:
+    def __init__(self):
+        self.api_key = os.getenv("ELEVENLABS_API_KEY")
+        self.client = ElevenLabs(api_key=self.api_key)
+        self.model_id = "eleven_turbo_v2_5"
+
+    def clone_voice(self, voice_bytes: bytes, name: str):
+        try:
+            response = self.client.voices.add(name=name, files=[voice_bytes])
+            return response
+            # return {"message": f"Voice '{name}' has been added successfully."}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+        
+    def text_to_cloned_voice(self, text: str, voice_id: str):
+        try:
+            response = self.client.text_to_speech.convert_as_stream(
+                voice_id=voice_id,
+                text=text,
+                model_id=self.model_id,
+                language_code="ko",
+            )
+
+            return response
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+        
+
+class ReplicateClient:
+    def __init__(self):
+        self.model = os.getenv("REPLICATE_MODEL")
+
+    def transform_face_age(self, image: str, target_age: str):
+        input = {
+            "image": image,
+            "target_age": target_age
+        }
+        try:
+            output = replicate.run(self.model, input=input)
+            return output
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+class AzureBlobClient:
+    def __init__(self):
+        self.connect_str = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+        self.blob_service_client = BlobServiceClient.from_connection_string(self.connect_str)
+
+    def upload_image_to_storage(self, input_face: ImageBase64Data, container_name: str) -> str:
+        try:
+            # base64 문자열에서 이미지 데이터를 디코딩
+            image_bytes = base64.b64decode(input_face.base64_image)
+
+            image = Image.open(BytesIO(image_bytes))
+
+            # 업로드 파일 이름 무작위 생성
+            file_extension = os.path.splitext(input_face.filename)[1]
+            file_name = f"{uuid.uuid4()}{file_extension}"
+
+            # 임시 파일로 이미지를 저장
+            temp_file_path = f"./temp/{file_name}"
+            os.makedirs(os.path.dirname(temp_file_path), exist_ok=True)
+            image.save(temp_file_path)
+
+            # Azure Blob Storage에 업로드
+            blob_client = self.blob_service_client.get_blob_client(container=container_name, blob=file_name)
+
+            with open(temp_file_path, "rb") as data:
+                blob_client.upload_blob(data, overwrite=True)
+
+            # SAS 토큰 자동 생성
+            sas_token = generate_blob_sas(
+                account_name=self.blob_service_client.account_name,
+                container_name=container_name,
+                blob_name=file_name,
+                account_key=self.blob_service_client.credential.account_key,
+                permission=BlobSasPermissions(read=True),  # 읽기 권한 부여
+                expiry=datetime.now(timezone.utc) + timedelta(hours=1)  # 1시간 후 만료
+            )
+
+            # 임시 파일 삭제
+            os.remove(temp_file_path)
+
+            # SAS URL 생성
+            sas_url = f"{blob_client.url}?{sas_token}"
+
+            return sas_url
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")

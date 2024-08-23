@@ -1,3 +1,5 @@
 .env
 __pycache__/
 *.json
+__init__.py
+temp/
