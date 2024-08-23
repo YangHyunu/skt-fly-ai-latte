@@ -4,6 +4,8 @@ from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from prompts.reminisence_prompt import rem_prompt
 from prompts.refine_prompt import refining_prompt
+from prompts.midjourney import midjourney_prompt
+
 import aiohttp
 from fastapi import HTTPException
 import json
@@ -80,29 +82,44 @@ class reminiscence_gpt:
         self.update_ai_chat_history(response)
         return response
     
+    def return_history(self) -> list:
+        return self.chat_history
+    
     def get_chat_history(self) -> list:
         return self.chat_history
     
 
-    class refine_gpt:
-        def __init__(self):
-            self.api_key = os.getenv('OPENAI_API_KEY')
-            self.refine_model = ChatOpenAI(
-                api_key=self.api_key,
-                model="gpt-4o",
-                temperature=0.3,
-                top_p=0.7,
-                seed=42
-            )
-            self.midjourney_model = ChatOpenAI(
-                api_key = self.api_key,
-                model="gpt-4o",
-                temperature=0.0,
-                top_p=0.7,
-                seed=42
-            )
-            self.refine_prompt = PromptTemplate(prompt=refining_prompt)
-            self.refine_chain = LLMChain(
-                llm=self.refine_model,
-                prompt=self.refine_prompt
-            )
+class refine_gpt:
+    def __init__(self):
+        self.api_key = os.getenv('OPENAI_API_KEY')
+        self.refine_model = ChatOpenAI(
+            api_key=self.api_key,
+            model="gpt-4o",
+            temperature=0.3,
+            top_p=0.7,
+            seed=42
+        )
+        self.midjourney_model = ChatOpenAI(
+            api_key = self.api_key,
+            model="gpt-4o",
+            temperature=0.0,
+            top_p=0.7,
+            seed=42
+        )
+        self.refine_prompt = PromptTemplate(input_variables=['chat_history'], template=refining_prompt)
+        self.refine_chain = LLMChain(
+            llm=self.refine_model,
+            prompt=self.refine_prompt
+        )
+        self.midjourney_template = PromptTemplate(input_variables=['context'], template=midjourney_prompt)
+        self.midjourney_chain = LLMChain(
+            llm=self.midjourney_model,
+            prompt=self.midjourney_template
+        )
+
+    def refine(self, chat_history) -> str:
+        return self.refine_chain.run({"chat_history":chat_history})
+    
+    def make_midjourney_prompt(self, refine_story) -> str:
+        midjourney_input = self.midjourney_chain.run({"context":refine_story})
+        return midjourney_input

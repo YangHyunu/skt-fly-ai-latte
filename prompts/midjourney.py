@@ -1,0 +1,1 @@
+midjourney_prompt = "Translate the following text into English. Provide only the translated text without any additional explanations: {context}"

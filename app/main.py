@@ -1,8 +1,9 @@
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
-
-from api.routes import router as chat_router
+from motor.motor_asyncio import AsyncIOMotorClient
+from api.routes import chat_router
+from api.routes import refine_router
 from dotenv import load_dotenv
 from config import settings
 import asyncio
@@ -26,7 +27,8 @@ app.add_middleware(
 )
 
 app.include_router(chat_router) # /chat
-# app.include_router(refine_router)
+app.include_router(refine_router)
+#app.include_router(refine_router)
 @app.get("/")
 def read_root():
     return {"message": "Welcome to the FastAPI application!"}

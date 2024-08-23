@@ -3,7 +3,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 from dotenv import load_dotenv
 
-from classes import ClovaSpeechClient, reminiscence_gpt
+from classes import ClovaSpeechClient, reminiscence_gpt, refine_gpt
 
 # .env 파일 로드
 load_dotenv()
@@ -23,7 +23,7 @@ class Settings:
         # 클로바 클라이언트와 reminiscence_gpt 객체 초기화
         self.clova_client = None
         self.reminescense = None
-
+        self.refine = None
         # 초기화 시 콘솔 메시지 출력
         self._log_initialization()
 
@@ -39,10 +39,14 @@ class Settings:
 
     def initialize_clients(self):
         """클로바와 reminiscence GPT 클라이언트 초기화."""
+        print(f"[INFO] Initializing ClovaSpeechClient...")
         self.clova_client = ClovaSpeechClient()
+        print(f"[INFO] ClovaSpeechClient initialized.")
         print(f"[INFO] Initializing reminiscence_gpt...")
         self.reminescense = reminiscence_gpt()
         print(f"[INFO] reminiscence_gpt initialized.")
+        self.refine = refine_gpt()
+        print(f"[INFO] refine_gpt initialized.")
 
 # 설정 객체를 전역으로 사용
 settings = Settings()

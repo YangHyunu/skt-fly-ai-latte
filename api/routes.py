@@ -4,16 +4,17 @@ from app.schema import items as schemas
 from app.models.speech import AudioData
 from db.database import get_db
 from config import settings, Settings
+f
 import json
 
-router = APIRouter()
-
+chat_router = APIRouter()
+refine_router = APIRouter()
 # @router.get("/items/", response_model=list[schemas.Item])
 # def read_items(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
 #     items = db.query(models.Item).offset(skip).limit(limit).all()
 #     return items
 
-@router.post("/chat")
+@chat_router.post("/chat")
 async def chat(fe_audio_input:AudioData) -> dict:
     file_bytes = bytes(fe_audio_input.data)
     
@@ -37,10 +38,18 @@ async def chat(fe_audio_input:AudioData) -> dict:
         "transcription": transcription_text,
         "gpt_response": gpt_response
     }
-
-@router.post("/make_history")
+@refine_router.post("/make_story")
 async def make_story():
-    settings.reminescense.return_history
-    return 
+    current_chat_history = settings.reminescense.return_history()
+    context = settings.refine.refine(current_chat_history)
+    # context DB에 저장..하고 context로 midjourney prompt 생성
+    midjourney_input = settings.refine.make_midjourney_prompt(context)
+    #await image generate
+
+# @router.post("/make_story")
+# async def make_story():
+#     current_chat_history=settings.reminescense.return_history()
+#     settings.refine_
+#     return 
 # @router.put("/chat")
 # async def refine
