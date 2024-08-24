@@ -2,7 +2,7 @@ import os
 from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 from dotenv import load_dotenv
-
+from app.schema.db_schema import Persona, RecallBook, User
 from classes import (ClovaSpeechClient, reminiscence_gpt, refine_gpt, image_generator, ElevenLabsClient, ReplicateClient, AzureBlobClient)
 
 # .env 파일 로드
@@ -35,10 +35,10 @@ class Settings:
         print(f"Settings initialized with DATABASE_URL: {self.DATABASE_URL}")
         print(f"Settings initialized with CLOVA_SPEECH_INVOKE_URL: {self.CLOVA_SPEECH_INVOKE_URL}")
 
-    async def initialize_database(self, db_name="test"):
+    async def initialize_database(self, db_name="Loyola_test"):
         """비동기 데이터베이스 초기화."""
         client = AsyncIOMotorClient(self.DATABASE_URL)
-        await init_beanie(database=client[db_name], document_models=[])  # 여기에 모델 목록 추가
+        await init_beanie(database=client[db_name], document_models=[Persona, RecallBook, User])  # 여기에 모델 목록 추가
 
     def initialize_clients(self):
         """클로바와 reminiscence GPT 클라이언트 초기화."""
