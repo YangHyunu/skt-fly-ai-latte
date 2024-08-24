@@ -48,7 +48,7 @@ async def chat(fe_audio_input:AudioData) -> dict:
 
 
 @refine_router.post("/chat/make_story")
-async def make_story(chat_history:list[ChatPromptTemplate]):
+async def make_story(chat_history):
     #current_chat_history = settings.reminescense.return_history()
     context = settings.refine.refine(chat_history)
     # context DB에 저장..하고 context로 midjourney prompt 생성
@@ -72,7 +72,9 @@ async def make_story(chat_history:list[ChatPromptTemplate]):
         print(f"Error detected in image_checking process")
 
     db_input_data = {title: context}
-    return db_input_data, image_urls
+    return {"message": "image_generation and processing successful",
+            "context":db_input_data, 
+            "image_urls": image_urls}
 
 
 
