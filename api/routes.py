@@ -4,6 +4,7 @@ from app.models.speech import AudioData
 from app.models.image import ImageBase64Data
 from db.database import get_db
 from config import settings, Settings
+from langchain.prompts import ChatPromptTemplate
 
 import json
 
@@ -44,21 +45,35 @@ async def chat(fe_audio_input:AudioData) -> dict:
         "transcription": transcription_text,
         "gpt_response": gpt_response
     }
-@refine_router.post("/make_story")
-async def make_story():
-    current_chat_history = settings.reminescense.return_history()
-    context = settings.refine.refine(current_chat_history)
-    # context DB에 저장..하고 context로 midjourney prompt 생성
-    midjourney_input = settings.refine.make_midjourney_prompt(context)
-    #await image generate
 
-# @router.post("/make_story")
-# async def make_story():
-#     current_chat_history=settings.reminescense.return_history()
-#     settings.refine_
-#     return 
-# @router.put("/chat")
-# async def refine
+
+@refine_router.post("/chat/make_story")
+async def make_story(chat_history:list[ChatPromptTemplate]):
+    #current_chat_history = settings.reminescense.return_history()
+    context = settings.refine.refine(chat_history)
+    # context DB에 저장..하고 context로 midjourney prompt 생성
+    title, midjourney_input = settings.refine.make_midjourney_prompt(context)
+
+    #await image generate
+    try:
+        image_id = await settings.image_generate.create_image(midjourney_input)
+        if 'data' not in image_id or 'id' not in image_id['data']:
+            raise HTTPException(status_code=501, detail=f"image create Error")
+    
+    except Exception as e:
+        print(f"image create Error{e}")
+
+    image_info = image_id['data']['id']
+
+    try:
+        image_urls = await settings.image_generate.check_image_status(image_info)
+    
+    except Exception as e:
+        print(f"Error detected in image_checking process")
+
+    db_input_data = {title: context}
+    return db_input_data, image_urls
+
 
 
 # 목소리 추가 엔드포인트

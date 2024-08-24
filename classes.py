@@ -4,9 +4,10 @@ from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from prompts.reminisence_prompt import rem_prompt
 from prompts.refine_prompt import refining_prompt
-from prompts.midjourney import midjourney_prompt
-
+from prompts.midjourney import midjourney_prompt, title_prompt
+import httpx
 import aiohttp
+import asyncio
 from fastapi import HTTPException
 import json
 import os
@@ -118,22 +119,60 @@ class refine_gpt:
             seed=42
         )
         self.refine_prompt = PromptTemplate(input_variables=['chat_history'], template=refining_prompt)
-        self.refine_chain = LLMChain(
-            llm=self.refine_model,
-            prompt=self.refine_prompt
-        )
+        self.refine_chain = LLMChain(llm=self.refine_model,
+                            prompt=self.refine_prompt)
+        
+        self.title_template = PromptTemplate(input_variables=['context'], template=title_prompt)
+        self.title_chain = LLMChain(llm=self.midjourney_model,
+                                    prompt=self.title_template)
+        
         self.midjourney_template = PromptTemplate(input_variables=['context'], template=midjourney_prompt)
-        self.midjourney_chain = LLMChain(
-            llm=self.midjourney_model,
-            prompt=self.midjourney_template
-        )
+        self.midjourney_chain = LLMChain(llm=self.midjourney_model,
+                                    prompt=self.midjourney_template)
 
     def refine(self, chat_history) -> str:
         return self.refine_chain.run({"chat_history":chat_history})
     
     def make_midjourney_prompt(self, refine_story) -> str:
+        title = self.title_chain.run({"context":refine_story})
         midjourney_input = self.midjourney_chain.run({"context":refine_story})
-        return midjourney_input
+        return title, midjourney_input
+
+
+class image_generator:
+    def __init__(self):
+        self.api_key = os.getenv("IMA_API_KEY")
+        self.headers = {
+            'Authorization' : f'Bearer {self.api_key}',
+            'Content-Type' : 'application/json'
+        }
+
+    async def create_image(self, context: str) -> dict:
+        data = {"prompt": context}
+        async with httpx.AsyncClient() as client:
+            response = await client.post("https://cl.imagineapi.dev/items/images/", json=data, headers=self.headers)
+        return response.json()
+    
+    async def check_image_status(self, image_id: str) -> list:
+        async with httpx.AsyncClient() as client:
+            while True:
+                response = await client.get(f'https://cl.imagineapi.dev/items/images/{image_id}', headers=self.headers)
+                response_data = response.json()
+                if response_data['data']['status'] == 'completed':
+                    if 'upscaled_urls' in response_data['data']:
+                        return response_data['data']['upscaled_urls']
+                    else:
+                        print('image created')
+                        raise HTTPException(status_code=502, detail='image created')
+                    
+                elif response_data['data']['status'] == 'failed':
+                    print('image creation Failed')
+                    raise HTTPException(status_code=503, detail='image creation Failed')
+
+                else:
+                    print('waiting for image generation')
+                    asyncio.sleep(15)
+
 
 class ElevenLabsClient:
     def __init__(self):

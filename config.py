@@ -3,7 +3,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 from dotenv import load_dotenv
 
-from classes import ClovaSpeechClient, reminiscence_gpt, refine_gpt, ElevenLabsClient, ReplicateClient, AzureBlobClient
+from classes import (ClovaSpeechClient, reminiscence_gpt, refine_gpt, image_generator, ElevenLabsClient, ReplicateClient, AzureBlobClient)
 
 # .env 파일 로드
 load_dotenv()
@@ -50,6 +50,8 @@ class Settings:
         print(f"[INFO] reminiscence_gpt initialized.")
         self.refine = refine_gpt()
         print(f"[INFO] refine_gpt initialized.")
+        self.image_generate = image_generator()
+        print(f"[INFO] AzureBlobClient initialized.")
         self.azure_client = AzureBlobClient()
         print(f"[INFO] AzureBlobClient initialized.")
         self.elevenlabs = ElevenLabsClient()
