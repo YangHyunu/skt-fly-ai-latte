@@ -113,16 +113,17 @@ def text_to_cloned_voice(text: str, voice_id: str):
 def transform_face_age(input_face: ImageBase64Data, target_age: str):
 
     try:
-        container_name = "selfie"
+        original_image_container_name = "selfie"
+        modifiec_image_container_name = "persona-image"
 
         # Base64 형식으로 받아 이미지로 변환 후 Azure blob storage에 업로드하여 이미지 url을 얻음
-        image_url = settings.azure_client.upload_image_to_storage(input_face=input_face, container_name=container_name)
+        image_url = settings.azure_client.upload_image_to_storage(input_face=input_face, container_name=original_image_container_name)
 
         # 사진 이미지 url으로 target_age의 얼굴 사진 url을 얻음
-        output_url = settings.replicate.transform_face_age(image=image_url, target_age=target_age)
+        replicate_url = settings.replicate.transform_face_age(image=image_url, target_age=target_age)
         
-        # 위의 url로 이미지를 받아 Azure bloc storage에 업로드하고 해당 url을 제공할 예정
-        '''추가 예정'''
+        # 위의 url로 이미지를 받아 Azure bloc storage에 업로드하고 해당 url을 제공
+        output_url = settings.azure_client.upload_image_url_to_storage(image_url=replicate_url, container_name=modifiec_image_container_name)
 
         return output_url
     

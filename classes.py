@@ -20,6 +20,8 @@ from app.models.image import ImageBase64Data
 from PIL import Image
 from io import BytesIO
 from datetime import datetime, timedelta, timezone
+from rembg import remove
+import requests
 
 # .env 파일 로드
 load_dotenv()
@@ -189,8 +191,54 @@ class AzureBlobClient:
             image = Image.open(BytesIO(image_bytes))
 
             # 업로드 파일 이름 무작위 생성
-            file_extension = os.path.splitext(input_face.filename)[1]
-            file_name = f"{uuid.uuid4()}{file_extension}"
+            # file_extension = os.path.splitext(input_face.filename)[1]
+            # file_name = f"{uuid.uuid4()}{file_extension}"
+            file_name = f"{uuid.uuid4()}.png"
+            
+            # 이미지 배경제거
+            clean_image = remove(image, bgcolor=(255, 255, 255, 255))
+
+            # 임시 파일로 이미지를 저장
+            temp_file_path = f"./temp/{file_name}"
+            os.makedirs(os.path.dirname(temp_file_path), exist_ok=True)
+            clean_image.save(temp_file_path)
+
+            # Azure Blob Storage에 업로드
+            blob_client = self.blob_service_client.get_blob_client(container=container_name, blob=file_name)
+
+            with open(temp_file_path, "rb") as data:
+                blob_client.upload_blob(data, overwrite=True)
+
+            # SAS 토큰 자동 생성
+            sas_token = generate_blob_sas(
+                account_name=self.blob_service_client.account_name,
+                container_name=container_name,
+                blob_name=file_name,
+                account_key=self.blob_service_client.credential.account_key,
+                permission=BlobSasPermissions(read=True),  # 읽기 권한 부여
+                expiry=datetime.now(timezone.utc) + timedelta(hours=1)  # 1시간 후 만료
+            )
+
+            # 임시 파일 삭제
+            os.remove(temp_file_path)
+
+            # SAS URL 생성
+            sas_url = f"{blob_client.url}?{sas_token}"
+
+            return sas_url
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
+        
+    def upload_image_url_to_storage(self, image_url: str, container_name: str):
+        try:
+            response = requests.get(image_url)
+            image = Image.open(BytesIO(response.content))
+
+            # 업로드 파일 이름 무작위 생성
+            # file_extension = os.path.splitext(input_face.filename)[1]
+            # file_name = f"{uuid.uuid4()}{file_extension}"
+            file_name = f"{uuid.uuid4()}.png"
 
             # 임시 파일로 이미지를 저장
             temp_file_path = f"./temp/{file_name}"
@@ -210,7 +258,7 @@ class AzureBlobClient:
                 blob_name=file_name,
                 account_key=self.blob_service_client.credential.account_key,
                 permission=BlobSasPermissions(read=True),  # 읽기 권한 부여
-                expiry=datetime.now(timezone.utc) + timedelta(hours=1)  # 1시간 후 만료
+                expiry=datetime.now(timezone.utc) + timedelta(days=30)  # 30일 후 만료 - 다만 SAS 자체 한계가 7일 인듯
             )
 
             # 임시 파일 삭제
