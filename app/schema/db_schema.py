@@ -2,12 +2,15 @@ from typing import Optional, List, Union
 from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, Field
 
-# 찬병이가 쓸거
 class Persona(Document):
     persona_id: PydanticObjectId = Field(default_factory=PydanticObjectId, description="id of persona instance")
     image_url: str
-    voice_id: str
+    voice_id: Optional[str] = None
     #chat_history: List[Union[HumanMessage, AIMessage]] = Field(default_factory=list)
+    user_id: PydanticObjectId
+
+class PersonaCreate(BaseModel):
+    image_url: str
     user_id: PydanticObjectId
 
 
@@ -30,7 +33,7 @@ class User(Document):
     recallbooks: List[PydanticObjectId] = Field(default_factory=list, description="List of recall_books_id")
 
 
-class Usercreate(BaseModel):
+class UserCreate(BaseModel):
     name: str = Field(min_length=1, max_length=50, description="사용자 이름")
     phone_number: str = Field(min_length=10, max_length=11, description="전화번호를 - 없이 입력해주세요.")
     password: str = Field(min_length=8, max_length=128, description="비밀번호")

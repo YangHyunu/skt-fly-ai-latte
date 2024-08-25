@@ -2,7 +2,12 @@ import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
 from motor.motor_asyncio import AsyncIOMotorClient
-from api.routes import chat_router, refine_router, elevenlabs_router, replicate_router, user_router, recallbook_router, login_router
+from api.routes import chat_router, refine_router, elevenlabs_router, replicate_router
+
+from api.user import user_router, login_router
+from api.persona import persona_router
+from api.recallbook import recallbook_router
+
 from dotenv import load_dotenv
 from config import settings
 import asyncio
@@ -30,8 +35,10 @@ app.include_router(refine_router)
 app.include_router(elevenlabs_router)
 app.include_router(replicate_router)
 app.include_router(user_router)
-app.include_router(recallbook_router)
 app.include_router(login_router)
+app.include_router(persona_router)
+app.include_router(recallbook_router)
+
 @app.get("/")
 def read_root():
     return {"message": "Welcome to the FastAPI application!"}

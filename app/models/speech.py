@@ -1,4 +1,4 @@
-from beanie import Document
+from beanie import Document, PydanticObjectId
 from pydantic import BaseModel
 from typing import Optional,List
 
@@ -10,3 +10,8 @@ class AudioData(BaseModel):
     
     class Config:
         from_attributes = True
+
+class PersonaAudioData(BaseModel):
+    data: List[int]  
+    filename: str
+    persona_id: PydanticObjectId

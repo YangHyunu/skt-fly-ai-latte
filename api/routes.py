@@ -1,16 +1,14 @@
 from fastapi import APIRouter, Depends,HTTPException
-from app.models.speech import AudioData
+from fastapi.responses import StreamingResponse
+from app.models.speech import AudioData, PersonaAudioData
 from app.models.image import ImageBase64Data
 from db.database import get_db
 from config import settings, Settings
 from langchain.prompts import ChatPromptTemplate
-from app.schema.db_schema import RecallBook, User, Persona, Usercreate, Recallbook_header, LoginHeader
+from app.schema.db_schema import RecallBook, User, Persona, Recallbook_header
 from beanie import PydanticObjectId
+
 import json
-
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
-
 
 chat_router = APIRouter()
 refine_router = APIRouter()
@@ -20,47 +18,12 @@ user_router = APIRouter()
 recallbook_router = APIRouter()
 login_router = APIRouter()
 
-@user_router.post("/user_create/")
-async def create_user_instance(fe_input:Usercreate):
-    existing_user = await User.find_one(User.phone_number == fe_input.phone_number)
-    # 고유값 : 폰번호 중복검사
-    if existing_user:
-        raise HTTPException(status_code=400, detail="User with this phone number already exists")
-    # User class 형태 로 frontend 입력 변환
-    user_data = User(name = fe_input.name,
-            phone_number = fe_input.phone_number,
-            password = fe_input.password,
-            birth=fe_input.birth,
-            gender=fe_input.gender,
-            )
-    # 이미 초기화 되어있는 DB에 삽입.
-    await user_data.insert()
-
-    return {"message": "User added in DB", "user_id": user_data.user_id }
-
-@login_router.post("/login/")
-async def login_user(fe_input: LoginHeader):
-    # 입력받은 전화번호로 사용자 조회
-    existing_user = await User.find_one(User.phone_number == fe_input.phone_number)
-    print(existing_user)
-    # 사용자가 존재하지 않으면 404 오류 반환
-    if not existing_user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    # 비밀번호가 일치하는지 확인
-    if fe_input.password != existing_user.password:
-        raise HTTPException(status_code=401, detail="Incorrect password")
-    id = str(existing_user.user_id)
-    # 비밀번호가 일치하면 user_id 반환
-    return {"user_id": id}
-
-
 @chat_router.post("/chat")
-async def chat(fe_audio_input:AudioData) -> dict:
-    file_bytes = bytes(fe_audio_input.data)
+async def chat(persona_audio_input: PersonaAudioData) -> dict:
+    file_bytes = bytes(persona_audio_input.data)
     
     try:
-        clova_response = await settings.clova_client.req_upload(file_bytes=file_bytes, completion='sync', filename=fe_audio_input.filename)
+        clova_response = await settings.clova_client.req_upload(file_bytes=file_bytes, completion='sync', filename=persona_audio_input.filename)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Clova API STT Request Error audio file name is {str(e)}")
@@ -73,11 +36,42 @@ async def chat(fe_audio_input:AudioData) -> dict:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"gpt response Error {str(e)}")
     print(gpt_response)
+
+    # Text-To-Speech
+    try:
+        # voice_id 받아오기
+        persona = await Persona.find_one(Persona.persona_id == persona_audio_input.persona_id)
+        voice_id = persona.voice_id
+        
+        # text to cloned voice
+        response = settings.elevenlabs.text_to_cloned_voice(text=gpt_response, voice_id=voice_id)
+
+        audio_name = "response_voice.mp3"
+
+        # 제너레이터로부터 바이너리 데이터 수집
+        audio_bytes = bytearray()
+        for chunk in response:
+            if chunk:
+                audio_bytes.extend(chunk)
+        
+        # 바이너리 데이터를 list[int]로 변환
+        audio_array = list(audio_bytes)
+
+        # AudioData 형식으로 변환
+        response_voice = AudioData(data=audio_array,
+                                   filename=audio_name,
+                                   )
+    
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred with text-to-speech, {e}")
     
     return {
         "message": "Upload and processing successful",
         "transcription": transcription_text,
-        "gpt_response": gpt_response
+        "gpt_response": gpt_response,
+        "response_voice": response_voice
     }
 
 
@@ -135,25 +129,33 @@ async def make_story(uid:Recallbook_header):
 
 
 # 목소리 추가 엔드포인트
-# 현재는 voice_id를 return하지만, 나중에는 user의 고유 id를 이용해 DB에 해당 값을 올릴 것이다.
 @elevenlabs_router.post("/voice/clone")
-def clone_voice(voice_request: AudioData):
+async def clone_voice(persona_audio_input: PersonaAudioData):
+
+    # 해당 persona에 voice_id가 존재한다면 에러
+    persona = await Persona.find_one(Persona.persona_id == persona_audio_input.persona_id)
+    if persona.voice_id:
+        raise HTTPException(status_code=400, detail="Persona already have cloned voice")
 
     # Array 형식의 데이터를 bytes로 변환
-    voice_bytes = bytes(voice_request.data)
+    voice_bytes = bytes(persona_audio_input.data)
 
     try:
-        response = settings.elevenlabs.clone_voice(name=voice_request.filename, voice_bytes=voice_bytes)
+        response = settings.elevenlabs.clone_voice(name=persona_audio_input.filename, voice_bytes=voice_bytes)
+
+        # voice_id를 해당 persona에 저장
+        await Persona.find_one(Persona.persona_id == persona_audio_input.persona_id).update({"$set": {Persona.voice_id: response.voice_id}})
 
         return {
-            "message": f"Voice '{voice_request.filename}' has been cloned successfully.",
-            "voice_id": response.voice_id,
+            "message": f"Voice '{persona_audio_input.filename}' has been cloned successfully.",
+            "voice_id": response.voice_id
         }
     
     except HTTPException as e:
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An error occurred while cloning the voice, {e}")
+
 
 # 복제 목소리 이용 TTS 엔드포인트
 # 현재는 voice_id를 직접적으로 받지만, 나중에는 user의 고유 id를 이용해 DB에서 해당 값을 가져올 것이다.
@@ -204,38 +206,3 @@ def transform_face_age(input_face: ImageBase64Data, target_age: str):
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An error occurred while transforming the face age, {e}")
-    
-
-@recallbook_router.post("/user_recallbook/")
-async def recall_book_search(uid: Recallbook_header):
-    # uid -> db에서 조회 -> recallbooks list 반환,
-    result = []
-    try:
-        user = await User.find_one({"user_id":uid.user_id})
-
-    except Exception as e:
-        print("user not found")
-        return {"message":"user not found"}
-    for recallbook_id in user.recallbooks:
-        recallbook_info = await RecallBook.find_one({"recallbook_id":recallbook_id})
-        result.append({
-            "recallbook_id":recallbook_id,
-            "recallbook_title": recallbook_info.title,
-            "recallbook_context": recallbook_info.context,
-            "recallbook_paint" : recallbook_info.paint_url
-            })
-    return { "recallbook_list": result }
-    
-
-async def get_recallbook(recallbook_id):
-    try:
-        recallbook_info = await RecallBook.find_one({"recallbook_id":recallbook_id})
-        return {
-                "recallbook_id":recallbook_id,
-                "recallbook_title": recallbook_info.title,
-                "recallbook_context": recallbook_info.context,
-                "recallbook_paint" : recallbook_info.paint_url
-                }
-    except Exception as e:
-        print("can't read recall_book")
-        return {"message": "Error reading recall book"}
