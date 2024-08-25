@@ -12,6 +12,7 @@ from fastapi import HTTPException
 import json
 import os
 from dotenv import load_dotenv
+from elevenlabs import VoiceSettings
 from elevenlabs.client import ElevenLabs
 import replicate
 import base64
@@ -195,6 +196,11 @@ class ElevenLabsClient:
                 text=text,
                 model_id=self.model_id,
                 language_code="ko",
+                voice_settings=VoiceSettings(
+                    stability=0.4,
+                    similarity_boost=0.8,
+                ),
+                seed=42,
             )
 
             return response

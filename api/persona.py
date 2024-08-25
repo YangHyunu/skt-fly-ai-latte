@@ -30,7 +30,10 @@ async def create_persona(fe_input: PersonaCreate):
     user.persona.append(persona_data.persona_id)
     await user.save() # 유저 정보 저장
 
-    return {"message": "Persona added to user's persona list", "user_id": persona_data.user_id, "persona_id": persona_data.persona_id}
+    return {"message": "Persona added to user's persona list",
+            "user_id": persona_data.user_id,
+            "persona_id": persona_data.persona_id,
+            "image_url": persona_data.image_url}
 
 # async def create_persona(image_url: str, user_id: PydanticObjectId):
 #     # feinput 변환 Persona 객체로

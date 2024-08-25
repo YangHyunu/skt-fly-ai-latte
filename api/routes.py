@@ -37,11 +37,37 @@ async def chat(persona_audio_input: PersonaAudioData) -> dict:
         raise HTTPException(status_code=500, detail=f"gpt response Error {str(e)}")
     print(gpt_response)
 
+    # voice cloning
+    persona = await Persona.find_one(Persona.persona_id == persona_audio_input.persona_id)
+    if not persona.voice_id:
+        # Array 형식의 데이터를 bytes로 변환
+        voice_bytes = bytes(persona_audio_input.data)
+
+        try:
+            response = settings.elevenlabs.clone_voice(name=persona_audio_input.filename, voice_bytes=voice_bytes)
+
+            # voice_id를 해당 persona에 저장
+            updated_persona = await Persona.find_one(Persona.persona_id == persona_audio_input.persona_id).update({"$set": {Persona.voice_id: response.voice_id}})
+
+            # 업데이트가 완료되었는지 확인하기 위해 문서를 다시 읽음
+            updated_persona = await Persona.find_one(Persona.persona_id == persona_audio_input.persona_id)
+
+            # 업데이트된 voice_id가 있는지 확인
+            if not updated_persona.voice_id:
+                raise HTTPException(status_code=500, detail="Failed to update voice_id in Persona")
+            
+        except HTTPException as e:
+            raise e
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"An error occurred while cloning the voice, {e}")
+
     # Text-To-Speech
     try:
         # voice_id 받아오기
         persona = await Persona.find_one(Persona.persona_id == persona_audio_input.persona_id)
         voice_id = persona.voice_id
+        if not voice_id:
+            raise HTTPException(status_code=404, detail="Voice ID not found after cloning.")
         
         # text to cloned voice
         response = settings.elevenlabs.text_to_cloned_voice(text=gpt_response, voice_id=voice_id)
@@ -128,59 +154,59 @@ async def make_story(uid:Recallbook_header):
 
 
 
-# 목소리 추가 엔드포인트
-@elevenlabs_router.post("/voice/clone")
-async def clone_voice(persona_audio_input: PersonaAudioData):
+# # 목소리 추가 엔드포인트
+# @elevenlabs_router.post("/voice/clone")
+# async def clone_voice(persona_audio_input: PersonaAudioData):
 
-    # 해당 persona에 voice_id가 존재한다면 에러
-    persona = await Persona.find_one(Persona.persona_id == persona_audio_input.persona_id)
-    if persona.voice_id:
-        raise HTTPException(status_code=400, detail="Persona already have cloned voice")
+#     # 해당 persona에 voice_id가 존재한다면 에러
+#     persona = await Persona.find_one(Persona.persona_id == persona_audio_input.persona_id)
+#     if persona.voice_id:
+#         raise HTTPException(status_code=400, detail="Persona already have cloned voice")
 
-    # Array 형식의 데이터를 bytes로 변환
-    voice_bytes = bytes(persona_audio_input.data)
+#     # Array 형식의 데이터를 bytes로 변환
+#     voice_bytes = bytes(persona_audio_input.data)
 
-    try:
-        response = settings.elevenlabs.clone_voice(name=persona_audio_input.filename, voice_bytes=voice_bytes)
+#     try:
+#         response = settings.elevenlabs.clone_voice(name=persona_audio_input.filename, voice_bytes=voice_bytes)
 
-        # voice_id를 해당 persona에 저장
-        await Persona.find_one(Persona.persona_id == persona_audio_input.persona_id).update({"$set": {Persona.voice_id: response.voice_id}})
+#         # voice_id를 해당 persona에 저장
+#         await Persona.find_one(Persona.persona_id == persona_audio_input.persona_id).update({"$set": {Persona.voice_id: response.voice_id}})
 
-        return {
-            "message": f"Voice '{persona_audio_input.filename}' has been cloned successfully.",
-            "voice_id": response.voice_id
-        }
+#         return {
+#             "message": f"Voice '{persona_audio_input.filename}' has been cloned successfully.",
+#             "voice_id": response.voice_id
+#         }
     
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"An error occurred while cloning the voice, {e}")
+#     except HTTPException as e:
+#         raise e
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"An error occurred while cloning the voice, {e}")
 
 
-# 복제 목소리 이용 TTS 엔드포인트
-# 현재는 voice_id를 직접적으로 받지만, 나중에는 user의 고유 id를 이용해 DB에서 해당 값을 가져올 것이다.
-@elevenlabs_router.post("/voice/text_to_voice")
-def text_to_cloned_voice(text: str, voice_id: str):
+# # 복제 목소리 이용 TTS 엔드포인트
+# # 현재는 voice_id를 직접적으로 받지만, 나중에는 user의 고유 id를 이용해 DB에서 해당 값을 가져올 것이다.
+# @elevenlabs_router.post("/voice/text_to_voice")
+# def text_to_cloned_voice(text: str, voice_id: str):
 
-    try:
-        response = settings.elevenlabs.text_to_cloned_voice(text=text, voice_id=voice_id)
+#     try:
+#         response = settings.elevenlabs.text_to_cloned_voice(text=text, voice_id=voice_id)
 
-        # with open(response, "rb") as audio_file:
-        #     audio_data = audio_file.read()
+#         # with open(response, "rb") as audio_file:
+#         #     audio_data = audio_file.read()
 
-        audio_name = "test_audio.mp3"
+#         audio_name = "test_audio.mp3"
 
-        headers = {
-            "Content-Disposition": f"attachment; filename={audio_name}"
-        }
+#         headers = {
+#             "Content-Disposition": f"attachment; filename={audio_name}"
+#         }
 
-        # FastAPI Response로 음성 파일 반환
-        return StreamingResponse(content=response, media_type="audio/mpeg", headers=headers)
+#         # FastAPI Response로 음성 파일 반환
+#         return StreamingResponse(content=response, media_type="audio/mpeg", headers=headers)
     
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"An error occurred with text-to-speech, {e}")
+#     except HTTPException as e:
+#         raise e
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"An error occurred with text-to-speech, {e}")
 
 
 # 얼굴 이미지 나이 변경
