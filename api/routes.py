@@ -4,8 +4,8 @@ from app.models.image import ImageBase64Data
 from db.database import get_db
 from config import settings, Settings
 from langchain.prompts import ChatPromptTemplate
-from app.schema.db_schema import RecallBook, User, Persona
-
+from app.schema.db_schema import RecallBook, User, Persona, Usercreate, Recallbook_header
+from beanie import PydanticObjectId
 import json
 
 from fastapi import APIRouter, HTTPException
@@ -17,19 +17,20 @@ refine_router = APIRouter()
 elevenlabs_router = APIRouter()
 replicate_router = APIRouter()
 user_router = APIRouter()
+recallbook_router = APIRouter()
 
 @user_router.post("/login/")
-async def create_user_instance(fe_input:dict):
-    existing_user = await User.find_one(User.phone_number == fe_input['phone_number'])
+async def create_user_instance(fe_input:Usercreate):
+    existing_user = await User.find_one(User.phone_number == fe_input.phone_number)
     # 고유값 : 폰번호 중복검사
     if existing_user:
         raise HTTPException(status_code=400, detail="User with this phone number already exists")
     # User class 형태 로 frontend 입력 변환
-    user_data = User(name = fe_input['name'],
-            phone_number = fe_input['phone_number'],
-            password = fe_input['password'],
-            birth=fe_input['birth'],
-            gender=fe_input['gender'],
+    user_data = User(name = fe_input.name,
+            phone_number = fe_input.phone_number,
+            password = fe_input.password,
+            birth=fe_input.birth,
+            gender=fe_input.gender,
             )
     # 이미 초기화 되어있는 DB에 삽입.
     await user_data.insert()
@@ -187,3 +188,38 @@ def transform_face_age(input_face: ImageBase64Data, target_age: str):
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An error occurred while transforming the face age, {e}")
+    
+
+@recallbook_router.post("/user_recallbook/")
+async def recall_book_search(uid: Recallbook_header):
+    # uid -> db에서 조회 -> recallbooks list 반환,
+    result = []
+    try:
+        user = await User.find_one({"user_id":uid.user_id})
+
+    except Exception as e:
+        print("user not found")
+        return {"message":"user not found"}
+    for recallbook_id in user.recallbooks:
+        recallbook_info = await RecallBook.find_one({"recallbook_id":recallbook_id})
+        result.append({
+            "recallbook_id":recallbook_id,
+            "recallbook_title": recallbook_info.title,
+            "recallbook_context": recallbook_info.context,
+            "recallbook_paint" : recallbook_info.paint_url
+            })
+    return { "recallbook_list": result }
+    
+
+async def get_recallbook(recallbook_id):
+    try:
+        recallbook_info = await RecallBook.find_one({"recallbook_id":recallbook_id})
+        return {
+                "recallbook_id":recallbook_id,
+                "recallbook_title": recallbook_info.title,
+                "recallbook_context": recallbook_info.context,
+                "recallbook_paint" : recallbook_info.paint_url
+                }
+    except Exception as e:
+        print("can't read recall_book")
+        return {"message": "Error reading recall book"}
