@@ -16,10 +16,26 @@ chat_router = APIRouter()
 refine_router = APIRouter()
 elevenlabs_router = APIRouter()
 replicate_router = APIRouter()
-# @router.get("/items/", response_model=list[schemas.Item])
-# def read_items(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
-#     items = db.query(models.Item).offset(skip).limit(limit).all()
-#     return items
+user_router = APIRouter()
+
+@user_router.post("/login/")
+async def create_user_instance(fe_input:dict):
+    existing_user = await User.find_one(User.phone_number == fe_input['phone_number'])
+    # 고유값 : 폰번호 중복검사
+    if existing_user:
+        raise HTTPException(status_code=400, detail="User with this phone number already exists")
+    # User class 형태 로 frontend 입력 변환
+    user_data = User(name = fe_input['name'],
+            phone_number = fe_input['phone_number'],
+            password = fe_input['password'],
+            birth=fe_input['birth'],
+            gender=fe_input['gender'],
+            )
+    # 이미 초기화 되어있는 DB에 삽입.
+    await user_data.insert()
+
+    return {"message": "User added in DB", "user_id": user_data.user_id }
+
 
 @chat_router.post("/chat")
 async def chat(fe_audio_input:AudioData) -> dict:
@@ -48,8 +64,9 @@ async def chat(fe_audio_input:AudioData) -> dict:
 
 
 @refine_router.post("/chat/make_story")
-async def make_story(uid:User):
-    current_chat_history = settings.reminescense.return_history()
+async def make_story(uid:str, chat_history):
+    current_chat_history = chat_history
+    # current_chat_history = settings.reminescense.return_history()
     if len(current_chat_history) == 0:
         return {"message": "no chatting history"}
     
@@ -78,7 +95,7 @@ async def make_story(uid:User):
         title=title,
         context=context,
         paint_url=image_urls[1],
-        user_id=uid.user_id
+        user_id=uid
     ) 
     try:
         await recallbook_data.insert()
