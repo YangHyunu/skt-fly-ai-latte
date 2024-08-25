@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends,HTTPException
 from fastapi.responses import StreamingResponse
-from app.models.speech import AudioData, PersonaAudioData
+from app.models.speech import AudioData, PersonaAudioData, PersonaBase64AudioData
 from app.models.image import ImageBase64Data
 from db.database import get_db
 from config import settings, Settings
 from langchain.prompts import ChatPromptTemplate
 from app.schema.db_schema import RecallBook, User, Persona, Recallbook_header
 from beanie import PydanticObjectId
+import base64
 
 import json
 
@@ -19,8 +20,10 @@ recallbook_router = APIRouter()
 login_router = APIRouter()
 
 @chat_router.post("/chat")
-async def chat(persona_audio_input: PersonaAudioData) -> dict:
-    file_bytes = bytes(persona_audio_input.data)
+async def chat(persona_audio_input: PersonaBase64AudioData) -> dict:
+    file_bytes = base64.b64decode(persona_audio_input.base64_audio)
+
+    # file_bytes = bytes(persona_audio_input.data)
     
     try:
         clova_response = await settings.clova_client.req_upload(file_bytes=file_bytes, completion='sync', filename=persona_audio_input.filename)
@@ -41,7 +44,7 @@ async def chat(persona_audio_input: PersonaAudioData) -> dict:
     persona = await Persona.find_one(Persona.persona_id == persona_audio_input.persona_id)
     if not persona.voice_id:
         # Array 형식의 데이터를 bytes로 변환
-        voice_bytes = bytes(persona_audio_input.data)
+        voice_bytes = base64.b64decode(persona_audio_input.base64_audio)
 
         try:
             response = settings.elevenlabs.clone_voice(name=persona_audio_input.filename, voice_bytes=voice_bytes)
@@ -72,21 +75,14 @@ async def chat(persona_audio_input: PersonaAudioData) -> dict:
         # text to cloned voice
         response = settings.elevenlabs.text_to_cloned_voice(text=gpt_response, voice_id=voice_id)
 
-        audio_name = "response_voice.mp3"
-
         # 제너레이터로부터 바이너리 데이터 수집
         audio_bytes = bytearray()
         for chunk in response:
             if chunk:
                 audio_bytes.extend(chunk)
         
-        # 바이너리 데이터를 list[int]로 변환
-        audio_array = list(audio_bytes)
-
-        # AudioData 형식으로 변환
-        response_voice = AudioData(data=audio_array,
-                                   filename=audio_name,
-                                   )
+        # 바이너리 데이터를 base64로 인코딩
+        audio_base64 = base64.b64encode(audio_bytes)
     
     except HTTPException as e:
         raise e
@@ -97,7 +93,7 @@ async def chat(persona_audio_input: PersonaAudioData) -> dict:
         "message": "Upload and processing successful",
         "transcription": transcription_text,
         "gpt_response": gpt_response,
-        "response_voice": response_voice
+        "response_voice": audio_base64
     }
 
 

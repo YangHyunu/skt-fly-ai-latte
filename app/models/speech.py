@@ -15,3 +15,14 @@ class PersonaAudioData(BaseModel):
     data: List[int]  
     filename: str
     persona_id: PydanticObjectId
+
+    class Config:
+        from_attributes = True
+
+class PersonaBase64AudioData(BaseModel):
+    base64_audio: str 
+    filename: str
+    persona_id: PydanticObjectId
+
+    class Config:
+        from_attributes = True
