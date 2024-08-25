@@ -4,7 +4,7 @@ from app.models.image import ImageBase64Data
 from db.database import get_db
 from config import settings, Settings
 from langchain.prompts import ChatPromptTemplate
-from app.schema.db_schema import RecallBook, User, Persona, Usercreate, Recallbook_header
+from app.schema.db_schema import RecallBook, User, Persona, Usercreate, Recallbook_header, LoginHeader
 from beanie import PydanticObjectId
 import json
 
@@ -18,8 +18,9 @@ elevenlabs_router = APIRouter()
 replicate_router = APIRouter()
 user_router = APIRouter()
 recallbook_router = APIRouter()
+login_router = APIRouter()
 
-@user_router.post("/login/")
+@user_router.post("/user_create/")
 async def create_user_instance(fe_input:Usercreate):
     existing_user = await User.find_one(User.phone_number == fe_input.phone_number)
     # 고유값 : 폰번호 중복검사
@@ -36,6 +37,22 @@ async def create_user_instance(fe_input:Usercreate):
     await user_data.insert()
 
     return {"message": "User added in DB", "user_id": user_data.user_id }
+
+@login_router.post("/login/")
+async def login_user(fe_input: LoginHeader):
+    # 입력받은 전화번호로 사용자 조회
+    existing_user = await User.find_one(User.phone_number == fe_input.phone_number)
+    print(existing_user)
+    # 사용자가 존재하지 않으면 404 오류 반환
+    if not existing_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # 비밀번호가 일치하는지 확인
+    if fe_input.password != existing_user.password:
+        raise HTTPException(status_code=401, detail="Incorrect password")
+    id = str(existing_user.user_id)
+    # 비밀번호가 일치하면 user_id 반환
+    return {"user_id": id}
 
 
 @chat_router.post("/chat")
