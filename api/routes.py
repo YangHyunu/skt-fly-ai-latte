@@ -82,9 +82,8 @@ async def chat(fe_audio_input:AudioData) -> dict:
 
 
 @refine_router.post("/chat/make_story")
-async def make_story(uid:str, chat_history):
-    current_chat_history = chat_history
-    # current_chat_history = settings.reminescense.return_history()
+async def make_story(uid:Recallbook_header):
+    current_chat_history = settings.reminescense.return_history()
     if len(current_chat_history) == 0:
         return {"message": "no chatting history"}
     
@@ -113,7 +112,7 @@ async def make_story(uid:str, chat_history):
         title=title,
         context=context,
         paint_url=image_urls[1],
-        user_id=uid
+        user_id=uid.user_id
     ) 
     try:
         await recallbook_data.insert()
