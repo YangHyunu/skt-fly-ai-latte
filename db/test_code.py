@@ -16,25 +16,24 @@ fe_user_input = {
     "phone_number" : "01011111111",
     "password" : "11111111",
     "birth":"1968-06-18",
-    "gender":"female",
+    "gender":"여성",
 }
 
 # DB에 넣을 객체로 다음과 같이 변환해야댐
-#@app.post("/users/", response_model=User) # 라우팅 되면 실행, User형식으로 데이터를 받아야 함. 
-#@app.post("/users/")
+#@app.post("/users/") # 라우팅 되면 실행, User형식으로 데이터를 받아야 함. 
 async def create_user_instance(fe_input):
     existing_user = await User.find_one(User.phone_number == fe_input['phone_number'])
     # 고유값 : 폰번호 중복검사
     if existing_user:
         raise HTTPException(status_code=400, detail="User with this phone number already exists")
-    
+    # User class 형태 로 frontend 입력 변환
     user_data = User(name = fe_input['name'],
             phone_number = fe_input['phone_number'],
             password = fe_input['password'],
             birth=fe_input['birth'],
             gender=fe_input['gender'],
             )
-    
+    # 이미 초기화 되어있는 DB에 삽입.
     await user_data.insert()
 
     return {"message": "User added in DB", "user_id": user_data.user_id }

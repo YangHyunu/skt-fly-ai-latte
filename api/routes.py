@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends,HTTPException
-from sqlalchemy.orm import Session
 from app.models.speech import AudioData
 from app.models.image import ImageBase64Data
 from db.database import get_db
 from config import settings, Settings
 from langchain.prompts import ChatPromptTemplate
+from app.schema.db_schema import RecallBook, User, Persona
 
 import json
 
@@ -39,7 +39,7 @@ async def chat(fe_audio_input:AudioData) -> dict:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"gpt response Error {str(e)}")
     print(gpt_response)
-
+    
     return {
         "message": "Upload and processing successful",
         "transcription": transcription_text,
@@ -48,9 +48,12 @@ async def chat(fe_audio_input:AudioData) -> dict:
 
 
 @refine_router.post("/chat/make_story")
-async def make_story(chat_history):
-    #current_chat_history = settings.reminescense.return_history()
-    context = settings.refine.refine(chat_history)
+async def make_story(uid:User):
+    current_chat_history = settings.reminescense.return_history()
+    if len(current_chat_history) == 0:
+        return {"message": "no chatting history"}
+    
+    context = settings.refine.refine(current_chat_history)
     # context DB에 저장..하고 context로 midjourney prompt 생성
     title, midjourney_input = settings.refine.make_midjourney_prompt(context)
 
@@ -70,11 +73,30 @@ async def make_story(chat_history):
     
     except Exception as e:
         print(f"Error detected in image_checking process")
+    
+    recallbook_data = RecallBook( # 삽입할 데이터 생성
+        title=title,
+        context=context,
+        paint_url=image_urls[1],
+        user_id=uid.user_id
+    ) 
+    try:
+        await recallbook_data.insert()
+    except Exception as e:
+        print(f"Error detected in recallbook data insertion")
+    
+    user = await User.find_one({"user_id":recallbook_data.user_id})
+    if recallbook_data.recallbook_id not in user.recallbooks:
+        user.recallbooks.append(recallbook_data.recallbook_id)
+        await user.save() # 유저 정보 저장
+        # 현재 chatting History 초기화
+        settings.reminescense.chat_history = []
+    else:
+        return {"message":"samebook exist"}
 
-    db_input_data = {title: context}
-    return {"message": "image_generation and processing successful",
-            "context":db_input_data, 
-            "image_urls": image_urls}
+    return {"message": "Recallbook added to user's recallbook list", 
+            "user_id": recallbook_data.user_id, 
+            "recallbook_id": recallbook_data.recallbook_id}
 
 
 
