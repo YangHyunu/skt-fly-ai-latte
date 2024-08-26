@@ -21,29 +21,11 @@ login_router = APIRouter()
 
 @chat_router.post("/chat")
 async def chat(persona_audio_input: PersonaBase64AudioData) -> dict:
-    file_bytes = base64.b64decode(persona_audio_input.base64_audio)
-
-    # file_bytes = bytes(persona_audio_input.data)
     
-    try:
-        clova_response = await settings.clova_client.req_upload(file_bytes=file_bytes, completion='sync', filename=persona_audio_input.filename)
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Clova API STT Request Error audio file name is {str(e)}")
-    
-    transcription_text = clova_response.get("text", "")
-    print(transcription_text)
-    #settings.reminescense.get_chat_history()
-    try:
-        gpt_response = settings.reminescense.get_gpt_response(clova_text=transcription_text)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"gpt response Error {str(e)}")
-    print(gpt_response)
-
     # voice cloning
     persona = await Persona.find_one(Persona.persona_id == persona_audio_input.persona_id)
     if not persona.voice_id:
-        # Array 형식의 데이터를 bytes로 변환
+        # Base64로 인코딩된 데이터를 bytes로 변환
         voice_bytes = base64.b64decode(persona_audio_input.base64_audio)
 
         try:
@@ -58,12 +40,34 @@ async def chat(persona_audio_input: PersonaBase64AudioData) -> dict:
             # 업데이트된 voice_id가 있는지 확인
             if not updated_persona.voice_id:
                 raise HTTPException(status_code=500, detail="Failed to update voice_id in Persona")
-            
+                
         except HTTPException as e:
             raise e
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"An error occurred while cloning the voice, {e}")
+        
+    # 음성 디코딩
+    file_bytes = base64.b64decode(persona_audio_input.base64_audio)
+    
+    # Speech-To-Text
+    try:
+        clova_response = await settings.clova_client.req_upload(file_bytes=file_bytes, completion='sync', filename=persona_audio_input.filename)
 
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Clova API STT Request Error audio file name is {str(e)}")
+    
+    transcription_text = clova_response.get("text", "")
+    print(transcription_text)
+    #settings.reminescense.get_chat_history()
+
+    # GPT Response 얻기
+    try:
+        gpt_response = settings.reminescense.get_gpt_response(clova_text=transcription_text)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"gpt response Error {str(e)}")
+    print(gpt_response)
+
+    
     # Text-To-Speech
     try:
         # voice_id 받아오기
@@ -145,8 +149,8 @@ async def make_story(uid:Recallbook_header):
         return {"message":"samebook exist"}
 
     return {"message": "Recallbook added to user's recallbook list", 
-            "user_id": recallbook_data.user_id, 
-            "recallbook_id": recallbook_data.recallbook_id}
+            "user_id": str(recallbook_data.user_id), 
+            "recallbook_id": str(recallbook_data.recallbook_id)}
 
 
 
