@@ -5,3 +5,11 @@ __init__.py
 temp/
 test.py
 *.m4a
+.idea
+.DS_Store
+pretrained_models/
+shape_predictor_68_face_landmarks.dat
+images/
+outputs/
+__pycache__/
+*.Identifier

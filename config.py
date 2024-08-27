@@ -3,7 +3,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 from dotenv import load_dotenv
 from app.schema.db_schema import Persona, RecallBook, User
-from classes import (ClovaSpeechClient, reminiscence_gpt, refine_gpt, image_generator, ElevenLabsClient, ReplicateClient, AzureBlobClient)
+from classes import (ClovaSpeechClient, reminiscence_gpt, refine_gpt, image_generator, ElevenLabsClient, ReplicateClient, AzureBlobClient, SAMClient)
 
 # .env 파일 로드
 load_dotenv()
@@ -58,6 +58,7 @@ class Settings:
         print(f"[INFO] ElevenLabsClient initialized.")
         self.replicate = ReplicateClient()
         print(f"[INFO] ReplicateClient initialized.")
+        self.sam_client = SAMClient()
 
 # 설정 객체를 전역으로 사용
 settings = Settings()

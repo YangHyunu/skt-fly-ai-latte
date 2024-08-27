@@ -25,6 +25,15 @@ from datetime import datetime, timedelta, timezone
 from rembg import remove
 import requests
 
+from argparse import Namespace
+import torch
+import torchvision.transforms as transforms
+import dlib
+from SAM.datasets.augmentations import AgeTransformer
+from SAM.utils.common import tensor2im
+from SAM.models.psp import pSp
+from SAM.scripts.align_all_parallel import align_face
+
 # .env 파일 로드
 load_dotenv()
 
@@ -197,8 +206,8 @@ class ElevenLabsClient:
                 model_id=self.model_id,
                 language_code="ko",
                 voice_settings=VoiceSettings(
-                    stability=0.4,
-                    similarity_boost=0.8,
+                    stability=0.8,
+                    similarity_boost=0.9,
                 ),
                 seed=42,
             )
@@ -316,3 +325,89 @@ class AzureBlobClient:
 
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
+        
+class SAMClient:
+    def __init__(self):
+        self.EXPERIMENT_TYPE = 'ffhq_aging'
+        self.EXPERIMENT_DATA_ARGS = {
+            "ffhq_aging": {
+                "model_path": "SAM/pretrained_models/sam_ffhq_aging.pt",
+                "transform": transforms.Compose([
+                    transforms.Resize((256, 256)),
+                    transforms.ToTensor(),
+                    transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])])
+            }
+        }
+        self.EXPERIMENT_ARGS = self.EXPERIMENT_DATA_ARGS[self.EXPERIMENT_TYPE]
+
+    def transform_face_age(self, input_image: ImageBase64Data, target_age: str):
+        
+        # 모델 로드
+        model_path = self.EXPERIMENT_ARGS['model_path']
+        ckpt = torch.load(model_path, map_location='cpu')
+
+        opts = ckpt['opts']
+
+        # update the training options
+        opts['checkpoint_path'] = model_path
+
+        opts = Namespace(**opts)
+        net = pSp(opts)
+        net.eval()
+        net.cuda()
+        print('Model successfully loaded!')
+
+        # 입력 이미지 디코딩
+        image_bytes = base64.b64decode(input_image.base64_image)
+
+        image = Image.open(BytesIO(image_bytes))
+
+        # 업로드 파일 이름 무작위 생성
+        file_name = f"{uuid.uuid4()}.png"
+            
+        # 이미지 배경제거
+        clean_image = remove(image, bgcolor=(255, 255, 255, 255))
+
+        # 임시 파일로 이미지를 저장
+        temp_file_path = f"./temp/{file_name}"
+        os.makedirs(os.path.dirname(temp_file_path), exist_ok=True)
+        clean_image.save(temp_file_path)
+
+        # 이미지 정렬
+        predictor = dlib.shape_predictor("SAM/shape_predictor_68_face_landmarks.dat")
+        aligned_image = align_face(filepath=temp_file_path, predictor=predictor)
+        aligned_image.resize((256, 256))
+
+        img_transforms = self.EXPERIMENT_ARGS['transform']
+        input_image = img_transforms(aligned_image)
+
+        # we'll run the image on multiple target ages
+        age_transformers = [AgeTransformer(target_age=int(target_age))]
+
+        for age_transformer in age_transformers:
+            with torch.no_grad():
+                input_image_age = [age_transformer(input_image.cpu()).to('cuda')]
+                input_image_age = torch.stack(input_image_age)
+                result_batch = net(input_image_age.to("cuda").float(), randomize_noise=False, resize=False)
+                result_tensor = result_batch[0]
+                result_image = tensor2im(result_tensor)
+
+        # 결과 이미지를 bytes-like 객체로 변환
+        byte_arr = BytesIO()
+        result_image.save(byte_arr, format="PNG")
+        output_image_bytes = byte_arr.getvalue()
+
+        # 결과 이미지 Base64로 인코딩
+        output_image = base64.b64encode(output_image_bytes)
+
+        modified_image = ImageBase64Data(
+            filename=file_name,
+            base64_image=output_image
+        )
+
+        # 임시 파일 삭제
+        os.remove(temp_file_path)
+
+        return modified_image
+
+

@@ -51,6 +51,7 @@ decorator==5.1.1
 defusedxml==0.7.1
 distributed @ file:///rapids/distributed-2022.7.1-py3-none-any.whl
 distro==1.9.0
+dlib==19.24.6
 dnspython==2.6.1
 ecdsa==0.19.0
 elevenlabs==1.7.0
