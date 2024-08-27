@@ -153,6 +153,27 @@ async def make_story(uid:Recallbook_header):
             "recallbook_id": str(recallbook_data.recallbook_id)}
 
 
+# 얼굴 이미지 나이 변경
+@replicate_router.post("/face/aging")
+def transform_face_age(input_face: ImageBase64Data, target_age: str):
+
+    try:
+        modifiec_image_container_name = "persona-image"
+
+        # Base64 형식으로 받아 이미지 변환 후 Base64 형식으로 결과를 얻음
+        result_face = settings.sam_client.transform_face_age(input_image=input_face, target_age=target_age)
+
+        # Base64 형식으로 받아 이미지로 변환 후 Azure blob storage에 업로드하여 이미지 url을 얻음
+        result_url = settings.azure_client.upload_image_to_storage(input_face=result_face, container_name=modifiec_image_container_name)
+
+        return result_url
+    
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred while aging the face, {e}")
+
+
 
 # # 목소리 추가 엔드포인트
 # @elevenlabs_router.post("/voice/clone")
@@ -209,46 +230,26 @@ async def make_story(uid:Recallbook_header):
 #         raise HTTPException(status_code=500, detail=f"An error occurred with text-to-speech, {e}")
 
 
-# 얼굴 이미지 나이 변경
-@replicate_router.post("/face/transform")
-def transform_face_age(input_face: ImageBase64Data, target_age: str):
+# # 얼굴 이미지 나이 변경
+# @replicate_router.post("/face/transform")
+# def transform_face_age(input_face: ImageBase64Data, target_age: str):
 
-    try:
-        original_image_container_name = "selfie"
-        modifiec_image_container_name = "persona-image"
+#     try:
+#         original_image_container_name = "selfie"
+#         modifiec_image_container_name = "persona-image"
 
-        # Base64 형식으로 받아 이미지로 변환 후 Azure blob storage에 업로드하여 이미지 url을 얻음
-        image_url = settings.azure_client.upload_image_to_storage(input_face=input_face, container_name=original_image_container_name)
+#         # Base64 형식으로 받아 이미지로 변환 후 Azure blob storage에 업로드하여 이미지 url을 얻음
+#         image_url = settings.azure_client.upload_image_to_storage(input_face=input_face, container_name=original_image_container_name)
 
-        # 사진 이미지 url으로 target_age의 얼굴 사진 url을 얻음
-        replicate_url = settings.replicate.transform_face_age(image=image_url, target_age=target_age)
+#         # 사진 이미지 url으로 target_age의 얼굴 사진 url을 얻음
+#         replicate_url = settings.replicate.transform_face_age(image=image_url, target_age=target_age)
         
-        # 위의 url로 이미지를 받아 Azure bloc storage에 업로드하고 해당 url을 제공
-        output_url = settings.azure_client.upload_image_url_to_storage(image_url=replicate_url, container_name=modifiec_image_container_name)
+#         # 위의 url로 이미지를 받아 Azure bloc storage에 업로드하고 해당 url을 제공
+#         output_url = settings.azure_client.upload_image_url_to_storage(image_url=replicate_url, container_name=modifiec_image_container_name)
 
-        return output_url
+#         return output_url
     
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"An error occurred while transforming the face age, {e}")
-
-# 얼굴 이미지 나이 변경
-@replicate_router.post("/face/aging")
-def transform_face_age(input_face: ImageBase64Data, target_age: str):
-
-    try:
-        modifiec_image_container_name = "persona-image"
-
-        # Base64 형식으로 받아 이미지 변환 후 Base64 형식으로 결과를 얻음
-        result_face = settings.sam_client.transform_face_age(input_image=input_face, target_age=target_age)
-
-        # Base64 형식으로 받아 이미지로 변환 후 Azure blob storage에 업로드하여 이미지 url을 얻음
-        result_url = settings.azure_client.upload_image_to_storage(input_face=result_face, container_name=modifiec_image_container_name)
-
-        return result_url
-    
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"An error occurred while aging the face, {e}")
+#     except HTTPException as e:
+#         raise e
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"An error occurred while transforming the face age, {e}")

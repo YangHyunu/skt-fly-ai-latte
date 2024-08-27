@@ -35,6 +35,40 @@ async def create_persona(fe_input: PersonaCreate):
             "persona_id": str(persona_data.persona_id),
             "image_url": persona_data.image_url}
 
+
+@persona_router.delete("/persona/delete/{persona_id}")
+async def delete_persona(persona_id: PydanticObjectId, user_id: PydanticObjectId):
+    
+    # DB에서 persona_id의 페르소나 찾기
+    persona = await Persona.find_one(Persona.persona_id == persona_id)
+
+    if not persona:
+        raise HTTPException(status_code=404, detail="Persona not found")
+    
+    # DB에서 persona 삭제
+    await persona.delete()
+
+    # persona를 가지고 있는 user 확인
+    user = await User.find_one(User.user_id == user_id)
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    try:
+        # 리스트에서 특정 persona_id 삭제 (순서 유지)
+        user.persona.remove(persona_id)
+    except ValueError:
+        # 만약 리스트에 persona_id가 없으면 예외 발생
+        raise HTTPException(status_code=404, detail="Persona ID not found in user's persona list")
+    
+    # 유저 정보 저장
+    await user.save()
+
+    return {"message": "Persona deleted successfully",
+            "persona_id": str(persona_id),
+            "user_id": str(user_id)}
+
+
 # async def create_persona(image_url: str, user_id: PydanticObjectId):
 #     # feinput 변환 Persona 객체로
 #     persona_data = Persona(
