@@ -14,13 +14,15 @@ async def recall_book_search(uid: Recallbook_header):
     # uid -> db에서 조회 -> recallbooks list 반환,
     result = []
     try:
-        user = await User.find_one({"user_id":uid.user_id})
+        user = await User.find_one(User.user_id == uid.user_id)
+        # user = await User.find_one({"user_id":uid.user_id})
 
     except Exception as e:
         print("user not found")
         return {"message":"user not found"}
     for recallbook_id in user.recallbooks:
-        recallbook_info = await RecallBook.find_one({"recallbook_id":recallbook_id})
+        recallbook_info = await RecallBook.find_one(RecallBook.recallbook_id == recallbook_id)
+        # recallbook_info = await RecallBook.find_one({"recallbook_id":recallbook_id})
         result.append({
             "recallbook_id":recallbook_id,
             "recallbook_title": recallbook_info.title,

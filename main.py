@@ -2,7 +2,7 @@ import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
 from motor.motor_asyncio import AsyncIOMotorClient
-from api.routes import chat_router, refine_router, elevenlabs_router, replicate_router
+from api.routes import chat_router, refine_router, elevenlabs_router, sam_router
 
 from api.user import user_router, login_router
 from api.persona import persona_router
@@ -33,7 +33,7 @@ app.add_middleware(
 app.include_router(chat_router) # /chat
 app.include_router(refine_router)
 app.include_router(elevenlabs_router)
-app.include_router(replicate_router)
+app.include_router(sam_router)
 app.include_router(user_router)
 app.include_router(login_router)
 app.include_router(persona_router)

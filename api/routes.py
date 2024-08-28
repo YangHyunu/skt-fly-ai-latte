@@ -14,7 +14,7 @@ import json
 chat_router = APIRouter()
 refine_router = APIRouter()
 elevenlabs_router = APIRouter()
-replicate_router = APIRouter()
+sam_router = APIRouter()
 user_router = APIRouter()
 recallbook_router = APIRouter()
 login_router = APIRouter()
@@ -153,8 +153,8 @@ async def make_story(uid:Recallbook_header):
             "recallbook_id": str(recallbook_data.recallbook_id)}
 
 
-# 얼굴 이미지 나이 변경
-@replicate_router.post("/face/aging")
+# reference 이미지를 반영하여 얼굴 이미지 나이 변경
+@sam_router.post("/face/aging")
 async def transform_face_age(input_face: ImageBase64Data, target_age: str):
 
     try:
@@ -166,7 +166,6 @@ async def transform_face_age(input_face: ImageBase64Data, target_age: str):
         gender = user.gender
 
         # Base64 형식으로 받아 이미지 변환 후 Base64 형식으로 결과를 얻음
-        # result_face = settings.sam_client.transform_face_age(input_image=input_face, target_age=target_age)
         result_face = settings.sam_client.transform_face_age_with_reference(input_image=input_face, target_age=target_age, gender=gender)
 
         # Base64 형식으로 받아 이미지로 변환 후 Azure blob storage에 업로드하여 이미지 url을 얻음
@@ -179,6 +178,47 @@ async def transform_face_age(input_face: ImageBase64Data, target_age: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An error occurred while aging the face, {e}")
 
+# 본인의 과거 사진(target)이 있다면 이름 포함하여 수행
+@sam_router.post("/face/aging_with_target")
+async def transform_face_age(input_face: ImageBase64Data, target_age: str, target_face: ImageBase64Data):
+
+    try:
+        modifiec_image_container_name = "persona-image"
+
+        # Base64 형식으로 받아 이미지 변환 후 Base64 형식으로 결과를 얻음
+        result_face = settings.sam_client.transform_face_age_with_target(input_image=input_face, target_age=target_age, target_image=target_face)
+
+        # Base64 형식으로 받아 이미지로 변환 후 Azure blob storage에 업로드하여 이미지 url을 얻음
+        result_url = settings.azure_client.upload_image_to_storage(input_face=result_face, container_name=modifiec_image_container_name)
+
+        return result_url
+    
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred while aging the face, {e}")
+
+
+
+##################################################################################
+@sam_router.post("/face/aging_without_ref")
+async def transform_face_age(input_face: ImageBase64Data, target_age: str):
+
+    try:
+        modifiec_image_container_name = "persona-image"
+
+        # Base64 형식으로 받아 이미지 변환 후 Base64 형식으로 결과를 얻음
+        result_face = settings.sam_client.transform_face_age(input_image=input_face, target_age=target_age)
+
+        # Base64 형식으로 받아 이미지로 변환 후 Azure blob storage에 업로드하여 이미지 url을 얻음
+        result_url = settings.azure_client.upload_image_to_storage(input_face=result_face, container_name=modifiec_image_container_name)
+
+        return result_url
+    
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred while aging the face, {e}")
 
 
 # # 목소리 추가 엔드포인트
