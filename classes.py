@@ -339,6 +339,9 @@ class SAMClient:
             }
         }
         self.EXPERIMENT_ARGS = self.EXPERIMENT_DATA_ARGS[self.EXPERIMENT_TYPE]
+        self.MALE_REFERENCE_IMAGE_PATH = "SAM/images/reference/male_ref_image.png"
+        self.FEMALE_REFERENCE_IMAGE_PATH = "SAM/images/reference/female_ref_image.png"
+        self.LATENT_MASK = [8, 9]
 
     def transform_face_age(self, input_image: ImageBase64Data, target_age: str):
         
@@ -410,4 +413,103 @@ class SAMClient:
 
         return modified_image
 
+    def transform_face_age_with_reference(self, input_image: ImageBase64Data, target_age: str, gender: str):
+        
+        # 모델 로드
+        model_path = self.EXPERIMENT_ARGS['model_path']
+        ckpt = torch.load(model_path, map_location='cpu')
+
+        opts = ckpt['opts']
+
+        # update the training options
+        opts['checkpoint_path'] = model_path
+
+        opts = Namespace(**opts)
+        net = pSp(opts)
+        net.eval()
+        net.cuda()
+        print('Model successfully loaded!')
+
+        # 입력 이미지 디코딩
+        image_bytes = base64.b64decode(input_image.base64_image)
+
+        image = Image.open(BytesIO(image_bytes))
+
+        # 기준 이미지 가져오기
+        # 남성 여성 구분 필요
+        if gender == "남성":
+            ref_image = Image.open(self.MALE_REFERENCE_IMAGE_PATH)
+        else:
+            ref_image = Image.open(self.FEMALE_REFERENCE_IMAGE_PATH)    
+
+        # 업로드 파일 이름 무작위 생성
+        input_file_name = f"{uuid.uuid4()}.png"
+        ref_file_name = f"{uuid.uuid4()}.png"
+
+        # 이미지 배경제거
+        input_clean_image = remove(image, bgcolor=(255, 255, 255, 255))
+        ref_clean_image = remove(ref_image, bgcolor=(255, 255, 255, 255))
+
+        # 임시 파일로 이미지를 저장
+        input_temp_file_path = f"./temp/{input_file_name}"
+        os.makedirs(os.path.dirname(input_temp_file_path), exist_ok=True)
+        input_clean_image.save(input_temp_file_path)
+
+        ref_temp_file_path = f"./temp/{ref_file_name}"
+        os.makedirs(os.path.dirname(ref_temp_file_path), exist_ok=True)
+        ref_clean_image.save(ref_temp_file_path)
+
+        # 이미지 정렬
+        predictor = dlib.shape_predictor("SAM/shape_predictor_68_face_landmarks.dat")
+        
+        input_aligned_image = align_face(filepath=input_temp_file_path, predictor=predictor)
+        input_aligned_image.resize((256, 256))
+        img_transforms = self.EXPERIMENT_ARGS['transform']
+        input_norm_image = img_transforms(input_aligned_image)
+
+        ref_aligned_image = align_face(filepath=ref_temp_file_path, predictor=predictor)
+        ref_aligned_image.resize((256, 256))
+        img_transforms = self.EXPERIMENT_ARGS['transform']
+        ref_norm_image = img_transforms(ref_aligned_image)
+
+        # we'll run the image on multiple target ages
+        age_transformers = [AgeTransformer(target_age=int(target_age))]
+
+        for age_transformer in age_transformers:
+            with torch.no_grad():
+                # latent 얻기
+                ref_cuda_image = ref_norm_image.to("cuda")
+                ref_latents = net.pretrained_encoder(ref_cuda_image.unsqueeze(0)) + net.latent_avg
+                
+                input_image_age = [age_transformer(input_norm_image.cpu()).to('cuda')]
+                input_image_age = torch.stack(input_image_age)
+
+                result_batch = net(input_image_age.to("cuda").float(),
+                                   latent_mask=self.LATENT_MASK,
+                                   inject_latent=ref_latents,
+                                   # alpha=opts.mix_alpha,
+                                   resize=False)
+
+                # result_batch = net(input_image_age.to("cuda").float(), randomize_noise=False, resize=False)
+                result_tensor = result_batch[0]
+                result_image = tensor2im(result_tensor)
+
+        # 결과 이미지를 bytes-like 객체로 변환
+        byte_arr = BytesIO()
+        result_image.save(byte_arr, format="PNG")
+        output_image_bytes = byte_arr.getvalue()
+
+        # 결과 이미지 Base64로 인코딩
+        output_image = base64.b64encode(output_image_bytes)
+
+        modified_image = ImageBase64Data(
+            filename=input_file_name,
+            base64_image=output_image,
+            user_id=input_image.user_id
+        )
+
+        # 임시 파일 삭제
+        os.remove(input_temp_file_path)
+
+        return modified_image
 

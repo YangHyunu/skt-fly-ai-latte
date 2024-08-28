@@ -155,13 +155,19 @@ async def make_story(uid:Recallbook_header):
 
 # 얼굴 이미지 나이 변경
 @replicate_router.post("/face/aging")
-def transform_face_age(input_face: ImageBase64Data, target_age: str):
+async def transform_face_age(input_face: ImageBase64Data, target_age: str):
 
     try:
         modifiec_image_container_name = "persona-image"
 
+        # 성별 얻기
+        user = await User.find_one(User.user_id == input_face.user_id)
+
+        gender = user.gender
+
         # Base64 형식으로 받아 이미지 변환 후 Base64 형식으로 결과를 얻음
-        result_face = settings.sam_client.transform_face_age(input_image=input_face, target_age=target_age)
+        # result_face = settings.sam_client.transform_face_age(input_image=input_face, target_age=target_age)
+        result_face = settings.sam_client.transform_face_age_with_reference(input_image=input_face, target_age=target_age, gender=gender)
 
         # Base64 형식으로 받아 이미지로 변환 후 Azure blob storage에 업로드하여 이미지 url을 얻음
         result_url = settings.azure_client.upload_image_to_storage(input_face=result_face, container_name=modifiec_image_container_name)
