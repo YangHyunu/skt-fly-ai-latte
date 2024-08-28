@@ -3,7 +3,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 from dotenv import load_dotenv
 from app.schema.db_schema import Persona, RecallBook, User
-from classes import (ClovaSpeechClient, reminiscence_gpt, refine_gpt, image_generator, ElevenLabsClient, ReplicateClient, AzureBlobClient, SAMClient)
+from classes import ClovaSpeechClient, ReminiscenceAgent, refine_gpt, image_generator, ElevenLabsClient, ReplicateClient, AzureBlobClient, SAMClient
 
 # .env 파일 로드
 load_dotenv()
@@ -46,8 +46,8 @@ class Settings:
         self.clova_client = ClovaSpeechClient()
         print(f"[INFO] ClovaSpeechClient initialized.")
         print(f"[INFO] Initializing reminiscence_gpt...")
-        self.reminescense = reminiscence_gpt()
-        print(f"[INFO] reminiscence_gpt initialized.")
+        self.reminescense = ReminiscenceAgent()
+        print(f"[INFO] reminiscence_Agent initialized.")
         self.refine = refine_gpt()
         print(f"[INFO] refine_gpt initialized.")
         self.image_generate = image_generator()

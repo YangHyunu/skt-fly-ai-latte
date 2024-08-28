@@ -62,7 +62,7 @@ async def chat(persona_audio_input: PersonaBase64AudioData) -> dict:
 
     # GPT Response 얻기
     try:
-        gpt_response = settings.reminescense.get_gpt_response(clova_text=transcription_text)
+        gpt_response = await settings.reminescense.get_gpt_response(clova_text=transcription_text)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"gpt response Error {str(e)}")
     print(gpt_response)

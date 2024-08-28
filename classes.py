@@ -25,6 +25,9 @@ from datetime import datetime, timedelta, timezone
 from rembg import remove
 import requests
 
+from prompts.interview_list import interview_list
+from app.schema.db_schema import User, RecallBook
+from langchain.agents import AgentExecutor, create_tool_calling_agent, Tool, initialize_agent
 from argparse import Namespace
 import torch
 import torchvision.transforms as transforms
@@ -70,45 +73,141 @@ class ClovaSpeechClient:
                     raise HTTPException(status_code=response.status, detail="Clova Speech API Error")
                 return await response.json()
 
-
-class reminiscence_gpt:
+class ReminiscenceAgent:
     def __init__(self):
         self.api_key = os.getenv('OPENAI_API_KEY')
-        self.chat_model = ChatOpenAI(
+        self.temperature = 0.7
+        self.llm = ChatOpenAI(
             api_key=self.api_key,
             model="gpt-4o",
-            temperature=0.6,
-            top_p=0.7,
+            temperature=self.temperature,
+            top_p=0.6,
             seed=42
         )
-        self.persona_message = SystemMessage(content=rem_prompt)
+        self.loaded_context = None
+        self.instruction = None
+        self.prompt = None
         self.chat_history = []
-        prompt_template = self.create_prompt_template()
-        self.llm_chain = LLMChain(llm=self.chat_model, prompt=prompt_template)
+        self.agent = None
+        self.user = None
 
-    def update_user_chat_history(self, clova_text: str):
-        self.chat_history.append(HumanMessage(content=clova_text))
+    #login에서 같이 실행.
+    async def prepare_to_chat(self, uid:User):
+        self.user = uid
+        self.loaded_context = await self.context(uid)
+        self.instruction = self._init_instruction()
+        self.tools = [self._create_retrieve_history_tool(), self._create_recomendataion_list_tool()]
+        self.prompt = self.create_prompt()
+        self.chat_history = []
+        self.agent = self._init_agent(self.tools)
+        self.agent_excutor = AgentExecutor(agent=self.agent, tools=self.tools, verbose=True)
 
-    def update_ai_chat_history(self, model_response:str):
-        self.chat_history.append(AIMessage(content=model_response))
-        
-    def create_prompt_template(self) -> ChatPromptTemplate:
-        messages = [self.persona_message] + self.chat_history + ["{user_input}"]
-        prompt_template = ChatPromptTemplate(messages=messages)
-        return prompt_template
-        
-    def get_gpt_response(self, clova_text: str) -> str:
-        self.llm_chain.prompt = self.create_prompt_template()
-        response = self.llm_chain.run({"user_input":clova_text})
-        self.update_user_chat_history(clova_text)
-        self.update_ai_chat_history(response)
-        return response
+    def _init_agent(self, tools):
+        agent = create_tool_calling_agent(
+            llm=self.llm,
+            tools=tools,
+            prompt=self.prompt
+        )
+        return agent
+
+    def _init_instruction(self):
+        return [SystemMessage(content=rem_prompt.format(gender=self.user.gender, name=self.user.name, birth=self.user.birth))]
+
+    async def context(self, uid:User):
+        result = ""
+        if not uid.recallbooks:
+            return "No recallbooks"
+        for idx, recallbook_id in enumerate(uid.recallbooks):
+
+            idx += 1
+            recallbook_info = await RecallBook.find_one({"recallbook_id":recallbook_id})
+            result += f"{idx}: {recallbook_info.context}\n"
+        return result
+
+    def create_prompt(self):
+        messages = self.instruction + self.chat_history + ["{user_input}"] + ["{agent_scratchpad}"]
+        prompt = ChatPromptTemplate(messages=messages)
+        return prompt
     
-    def return_history(self) -> list:
-        return self.chat_history
+    def retrieve_history_tool(self, _=None):
+            if self.loaded_context and self.loaded_context != "No recallbooks":
+                return self.loaded_context
+            else:
+                return "저장된 이야기가 없음."
     
-    def get_chat_history(self) -> list:
+    def _create_retrieve_history_tool(self):
+        return Tool(name="RetrieveHistory", 
+                    func=self.retrieve_history_tool, 
+                    description=(
+                    "If the user asks about previous conversations or wants to recall past dialogues, "
+                    "use this tool to retrieve the user's chat history. For example, questions like 'What conversations did we have before?', "
+                    "'What did we talk about?', or 'Tell me about our past conversations' would trigger the use of this tool.""사용자가 이전 대화에 대해 질문하거나, 과거에 나눈 대화를 회상하고 싶어 하는 경우, "
+                        "이 도구를 사용하여 사용자의 대화 기록을 가져옵니다. 예를 들어, '전에 내가 어떤 채팅들을 했었지?', "
+                        "'우리가 무슨 얘기를 했었나요?', '과거에 나눈 대화를 알려줘'와 같은 질문에 이 도구를 사용합니다."),
+        )
+    ###########
+    def recomendation_list_tool(self, _=None):
+        return interview_list
+
+    def _create_recomendataion_list_tool(self):
+        return Tool(name="GetQuestionList",
+                    func=self.recomendation_list_tool,
+                    description=("이 도구는 다양한 생애 단계에 따라 관련된 질문이나 주제가 담겨 있습니다. 사용자가 주제를 요청하거나 추천받기를 원할 때 해당 객체 안에 있는 내용 중 하나를 골라 질문을 생성합니다."
+                    ))
+    ###########
+
+    async def get_gpt_response(self, clova_text:str):
+        user_message = HumanMessage(content=clova_text)
+        self.chat_history.append(user_message)
+        self.prompt = self.create_prompt() # chat_history load
+
+        response = await self.agent_excutor.ainvoke({"user_input": clova_text})
+
+        self.chat_history.append(response['output'])
+        
+        return response['output']
+    
+    def return_history(self):
         return self.chat_history
+
+# class reminiscence_gpt:
+#     def __init__(self):
+#         self.api_key = os.getenv('OPENAI_API_KEY')
+#         self.chat_model = ChatOpenAI(
+#             api_key=self.api_key,
+#             model="gpt-4o",
+#             temperature=0.6,
+#             top_p=0.7,
+#             seed=42
+#         )
+#         self.persona_message = SystemMessage(content=rem_prompt)
+#         self.chat_history = []
+#         prompt_template = self.create_prompt_template()
+#         self.llm_chain = LLMChain(llm=self.chat_model, prompt=prompt_template)
+
+#     def update_user_chat_history(self, clova_text: str):
+#         self.chat_history.append(HumanMessage(content=clova_text))
+
+#     def update_ai_chat_history(self, model_response:str):
+#         self.chat_history.append(AIMessage(content=model_response))
+        
+#     def create_prompt_template(self) -> ChatPromptTemplate:
+#         messages = [self.persona_message] + self.chat_history + ["{user_input}"]
+#         prompt_template = ChatPromptTemplate(messages=messages)
+#         return prompt_template
+        
+#     def get_gpt_response(self, clova_text: str) -> str:
+#         self.llm_chain.prompt = self.create_prompt_template()
+#         response = self.llm_chain.run({"user_input":clova_text})
+#         self.update_user_chat_history(clova_text)
+#         self.update_ai_chat_history(response)
+#         return response
+    
+#     def return_history(self) -> list:
+#         return self.chat_history
+    
+#     def get_chat_history(self) -> list:
+#         return self.chat_history
     
 
 class refine_gpt:

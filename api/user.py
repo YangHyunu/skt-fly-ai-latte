@@ -1,5 +1,6 @@
 from app.schema.db_schema import User, UserCreate, LoginHeader
 from fastapi import APIRouter, HTTPException
+from config import settings
 
 user_router = APIRouter()
 login_router = APIRouter()
@@ -43,6 +44,7 @@ async def login_user(fe_input: LoginHeader):
     # 비밀번호가 일치하는지 확인
     if fe_input.password != existing_user.password:
         raise HTTPException(status_code=401, detail="Incorrect password")
+    await settings.reminescense.prepare_to_chat(existing_user)
     id = str(existing_user.user_id)
     # 비밀번호가 일치하면 user_id 반환
     return {"user_id": id}
