@@ -145,12 +145,9 @@ class ReminiscenceAgent:
         return StructuredTool(name="RetrieveHistory", 
                     func=self.retrieve_history_tool, 
                     description=(
-                    """If the user asks about previous conversations or wants to recall past dialogues, 
-                    use this tool to retrieve the user's chat history. For example, questions like 'What conversations did we have before?', 
-                    'What did we talk about?', or 'Tell me about our past conversations' would trigger the use of this tool.
-                    사용자가 이전 대화에 대해 질문하거나, 과거에 나눈 대화를 회상하고 싶어 하는 경우, 
-                        이 도구를 사용하여 사용자의 대화 기록을 가져옵니다. 예를 들어, '전에 내가 어떤 채팅들을 했었지?', 
-                        '우리가 무슨 얘기를 했었나요?', '과거에 나눈 대화를 알려줘'와 같은 질문에 이 도구를 사용합니다."""),
+                    """이 도구는 사용자와 AI가 대화했던 기록들을 불러오는 도구이다.
+                    사용자의 질문에 답변하기 위해 이전에 나눴던 이야기가 필요할 경우, 이 도구를 사용하여 사용자의 대화 기록을 가져옵니다. 예를 들어, '전에 내가 너와 했던 채팅들에는 어떤것들이 있는지 보여줘', 
+                    '과거에 나눈 대화기록들 알려줘'와 같은 질문에 이 도구를 사용합니다."""),
                     args_schema=EmptyArgsSchema
                     )
     ###########
@@ -161,9 +158,9 @@ class ReminiscenceAgent:
         return StructuredTool(name="GetQuestionList",
                     func=self.recomendation_list_tool,
                     description=("""이 도구는 다양한 생애 단계에 따라 관련된 질문이나 주제가 담겨 있다., 
-                                 사용자가 주제를 요청하거나 추천받기를 원할 때 해당 객체 안에 있는 내용을 이용하여 답변을 생성한다.,
-                                 답변을 생성할 때에는 특정한 연령대를 먼저 말한다. ,
-                                 마지막으로 사용자에게 특정한 연령대내부에 있는 주제 3가지를 제공한다 이때 한국어로만 대답한다..
+                                 사용자가 주제를 요청하거나 추천받기를 원할 때 해당 객체 안에 있는 내용을 이용하여 답변을 생성한다. 예를 들어, '어떤 주제로 이야기 해야 할까?','무슨얘기하지?' 등의 질문에 답변을 아래를 참고해서 생성한다.,
+                                 답변을 생성할 때에는 특정한 연령대를 먼저 말한다. 예를 들어, '아동기 청소년기 청년기 장년기 노년기 주제가 있습니다! 어떤시대가 좋을까요?'처럼 답변을 생성한다.,
+                                 마지막으로 사용자에게 특정한 연령대내부에 있는 주제들을 제공한다. 예를 들어, '청소년기의 주제에는 어떤학교에 다녔는지, 기억에 남는 친구와의 추억, 잘했던 과목, 첫사랑 등이 있습니다' 처럼 답변을 생성한다.
                                  """
                     ),
                     args_schema=EmptyArgsSchema
