@@ -73,7 +73,6 @@ async def delete_persona(persona_id: PydanticObjectId, user_id: PydanticObjectId
     await user.save()
 
     return {"message": "Persona deleted successfully",
-            "elevenlabs_message": response.text,
             "persona_id": str(persona_id),
             "user_id": str(user_id)}
 
