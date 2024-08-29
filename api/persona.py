@@ -48,7 +48,10 @@ async def delete_persona(persona_id: PydanticObjectId, user_id: PydanticObjectId
     
     # voice cloning이 되어 있다면 해당 목소리도 제거
     if persona.voice_id:
-        response = settings.elevenlabs.delete_voice(voice_id=persona.voice_id)
+        voice_id = persona.voice_id
+        response = settings.elevenlabs.delete_voice(voice_id=voice_id)
+
+    persona = await Persona.find_one(Persona.persona_id == persona_id)
     
     # DB에서 persona 삭제
     await persona.delete()

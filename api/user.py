@@ -45,7 +45,7 @@ async def login_user(fe_input: LoginHeader):
     if fe_input.password != existing_user.password:
         raise HTTPException(status_code=401, detail="Incorrect password")
     await settings.reminescense.prepare_to_chat(existing_user)
-    await settings.refine.user = existing_user
+    settings.refine.user = existing_user
     id = str(existing_user.user_id)
     # 비밀번호가 일치하면 user_id 반환
     return {"user_id": id}

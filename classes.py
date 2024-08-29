@@ -241,7 +241,6 @@ class refine_gpt:
             top_p=0.7,
             seed=42
         )
-        self.user = None
         self.refine_prompt = PromptTemplate(input_variables=['chat_history'], template=refining_prompt)
         self.refine_chain = LLMChain(llm=self.refine_model,
                             prompt=self.refine_prompt)
@@ -250,7 +249,7 @@ class refine_gpt:
         self.title_chain = LLMChain(llm=self.midjourney_model,
                                     prompt=self.title_template)
         
-        self.midjourney_template = PromptTemplate(input_variables=['context', 'gender'], template=midjourney_prompt)
+        self.midjourney_template = PromptTemplate(input_variables=['context'], template=midjourney_prompt)
         self.midjourney_chain = LLMChain(llm=self.midjourney_model,
                                     prompt=self.midjourney_template)
 
@@ -259,11 +258,7 @@ class refine_gpt:
     
     def make_midjourney_prompt(self, refine_story) -> str:
         title = self.title_chain.run({"context":refine_story})
-        if self.user.gender == "남성":
-            gender = "male"
-        else:
-            gender = "female"
-        midjourney_input = self.midjourney_chain.run({"context":refine_story, "gender":gender})
+        midjourney_input = self.midjourney_chain.run({"context":refine_story})
         return title, midjourney_input
 
 
@@ -467,8 +462,8 @@ class SAMClient:
         self.EXPERIMENT_ARGS = self.EXPERIMENT_DATA_ARGS[self.EXPERIMENT_TYPE]
         self.MALE_DEFAULT_REFERENCE_IMAGE_PATH = "SAM/images/reference/male_ref_image.png"
         self.FEMALE_DEFAULT_REFERENCE_IMAGE_PATH = "SAM/images/reference/female_ref_image.png"
-        self.DEFAULT_LATENT_MASK = [9]
-        self.TARGET_REFERENCE_LATENT_MASK = [8, 9]
+        self.DEFAULT_LATENT_MASK = [8, 9]
+        self.TARGET_REFERENCE_LATENT_MASK = [7, 8, 9]
 
     def transform_face_age(self, input_image: ImageBase64Data, target_age: str):
 
