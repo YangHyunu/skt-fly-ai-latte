@@ -18,6 +18,10 @@ sam_router = APIRouter()
 user_router = APIRouter()
 recallbook_router = APIRouter()
 login_router = APIRouter()
+@chat_router.post("/ctct")
+async def ct(user_text):
+    response = await settings.reminescense.get_gpt_response(user_text)
+    return response
 
 @chat_router.post("/chat")
 async def chat(persona_audio_input: PersonaBase64AudioData) -> dict:
