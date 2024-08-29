@@ -171,6 +171,8 @@ class ReminiscenceAgent:
         user_message = HumanMessage(content=clova_text)
         self.chat_history.append(user_message)
         self.prompt = self.create_prompt() # chat_history load
+        self.agent = self._init_agent(self.tools)
+        self.agent_excutor = AgentExecutor(agent=self.agent, tools=self.tools, verbose=True)
 
         response = await self.agent_excutor.ainvoke({"user_input": clova_text})
 
@@ -238,6 +240,7 @@ class refine_gpt:
             top_p=0.7,
             seed=42
         )
+        self.user=None
         self.refine_prompt = PromptTemplate(input_variables=['chat_history'], template=refining_prompt)
         self.refine_chain = LLMChain(llm=self.refine_model,
                             prompt=self.refine_prompt)
@@ -255,7 +258,7 @@ class refine_gpt:
     
     def make_midjourney_prompt(self, refine_story) -> str:
         title = self.title_chain.run({"context":refine_story})
-        midjourney_input = self.midjourney_chain.run({"context":refine_story})
+        midjourney_input = self.midjourney_chain.run({"context":refine_story, "gender":self.user.gender})
         return title, midjourney_input
 
 
