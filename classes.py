@@ -80,7 +80,7 @@ class ClovaSpeechClient:
                 return await response.json()
 
 
-class ChatAgent:
+class ReminiscenceAgent:
     def __init__(self):
         self.api_key = os.getenv('OPENAI_API_KEY')
         self.temperature = 0.7
@@ -160,7 +160,7 @@ class ChatAgent:
                     func=self.recomendation_list_tool,
                     description=("""이 도구는 다양한 생애 단계에 따라 관련된 질문이나 주제가 담겨 있다., 
                                  사용자가 주제를 요청하거나 추천받기를 원할 때 해당 객체 안에 있는 내용을 이용하여 답변을 생성한다. 예를 들어, '주제 추천해줘','무슨 얘기하지?' 등의 질문에 답변을 아래를 참고해서 생성한다.,
-                                 주제에 관한 답변을 생성할 때에는 먼저 '아동기 청소년기 청년기 장년기 노년기 주제가 있습니다! 어떤시대가 좋을까요?'로 먼저 답변을 생성한다.,
+                                 주제에 관한 답변을 생성할 때에는 먼저 '아동기 청소년기 청년기 장년기 노년기 주제가 있습니다! 어떤시대가 좋을까요?'답변을 생성한다.,
                                  마지막으로 사용자에게 특정한 연령대내부에 있는 주제들을 제공한다. 예를 들어, '청소년기의 주제에는 어떤학교에 다녔는지, 기억에 남는 친구와의 추억, 잘했던 과목, 첫사랑 등이 있습니다' 처럼 답변을 생성한다.
                                  """
                     ),
@@ -178,7 +178,7 @@ class ChatAgent:
 
         self.chat_history.append(AIMessage(response['output']))
         return response['output']
-
+    
     def return_history(self):
         return self.chat_history
 
