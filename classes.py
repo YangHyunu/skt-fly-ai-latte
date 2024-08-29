@@ -160,9 +160,11 @@ class ReminiscenceAgent:
     def _create_recomendataion_list_tool(self):
         return StructuredTool(name="GetQuestionList",
                     func=self.recomendation_list_tool,
-                    description=("""이 도구는 다양한 생애 단계에 따라 관련된 질문이나 주제가 담겨 있습니다., 
+                    description=("""이 도구는 다양한 생애 단계에 따라 관련된 질문이나 주제가 담겨 있다., 
                                  사용자가 주제를 요청하거나 추천받기를 원할 때 해당 객체 안에 있는 내용을 이용하여 답변을 생성한다.,
-                                 답변을 생성할 때에는 특정한 연령대의 주제들을 말하도록 한다."""
+                                 답변을 생성할 때에는 특정한 연령대를 먼저 말한다. ,
+                                 마지막으로 사용자에게 특정한 연령대내부에 있는 주제 3가지를 제공한다 이때 한국어로만 대답한다..
+                                 """
                     ),
                     args_schema=EmptyArgsSchema
                     )
