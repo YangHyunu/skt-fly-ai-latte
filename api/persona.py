@@ -1,6 +1,7 @@
 from app.schema.db_schema import Persona, PersonaCreate, User
 from fastapi import APIRouter, HTTPException
 from beanie import PydanticObjectId
+from config import settings, Settings
 
 persona_router = APIRouter()
 
@@ -45,6 +46,10 @@ async def delete_persona(persona_id: PydanticObjectId, user_id: PydanticObjectId
     if not persona:
         raise HTTPException(status_code=404, detail="Persona not found")
     
+    # voice cloning이 되어 있다면 해당 목소리도 제거
+    if persona.voice_id:
+        response = settings.elevenlabs.delete_voice(voice_id=persona.voice_id)
+    
     # DB에서 persona 삭제
     await persona.delete()
 
@@ -65,6 +70,7 @@ async def delete_persona(persona_id: PydanticObjectId, user_id: PydanticObjectId
     await user.save()
 
     return {"message": "Persona deleted successfully",
+            "elevenlabs_message": response.text,
             "persona_id": str(persona_id),
             "user_id": str(user_id)}
 

@@ -329,6 +329,14 @@ class ElevenLabsClient:
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
         
+    def delete_voice(self, voice_id: str):
+        try:
+            response = self.client.voices.delete(voice_id=voice_id)
+
+            return response
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+        
 
 class ReplicateClient:
     def __init__(self):
