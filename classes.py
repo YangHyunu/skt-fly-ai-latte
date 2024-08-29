@@ -79,7 +79,8 @@ class ClovaSpeechClient:
                     raise HTTPException(status_code=response.status, detail="Clova Speech API Error")
                 return await response.json()
 
-class ReminiscenceAgent:
+
+class ChatAgent:
     def __init__(self):
         self.api_key = os.getenv('OPENAI_API_KEY')
         self.temperature = 0.7
@@ -112,7 +113,7 @@ class ReminiscenceAgent:
         agent = create_tool_calling_agent(
             llm=self.llm,
             tools=tools,
-            prompt=self.prompt
+            prompt=self.prompt,
         )
         return agent
 
@@ -146,8 +147,8 @@ class ReminiscenceAgent:
                     func=self.retrieve_history_tool, 
                     description=(
                     """이 도구는 사용자와 AI가 대화했던 기록들을 불러오는 도구이다.
-                    사용자의 질문에 답변하기 위해 이전에 나눴던 이야기가 필요할 경우, 이 도구를 사용하여 사용자의 대화 기록을 가져옵니다. 예를 들어, '전에 내가 너와 했던 채팅들에는 어떤것들이 있는지 보여줘', 
-                    '과거에 나눈 대화기록들 알려줘'와 같은 질문에 이 도구를 사용합니다."""),
+                    사용자의 질문에 답변하기 위해 이전에 나눴던 이야기가 필요할 경우, 이 도구를 사용하여 사용자의 대화 기록을 가져옵니다. 예를 들어, '내가 전에 너와 이런 이야기를 했나?', 
+                    '과거에 너와 내가 나눈 대화기록들 알려줘'와 같은 질문에 이 도구를 사용합니다."""),
                     args_schema=EmptyArgsSchema
                     )
     ###########
@@ -158,14 +159,14 @@ class ReminiscenceAgent:
         return StructuredTool(name="GetQuestionList",
                     func=self.recomendation_list_tool,
                     description=("""이 도구는 다양한 생애 단계에 따라 관련된 질문이나 주제가 담겨 있다., 
-                                 사용자가 주제를 요청하거나 추천받기를 원할 때 해당 객체 안에 있는 내용을 이용하여 답변을 생성한다. 예를 들어, '어떤 주제로 이야기 해야 할까?','무슨얘기하지?' 등의 질문에 답변을 아래를 참고해서 생성한다.,
-                                 답변을 생성할 때에는 특정한 연령대를 먼저 말한다. 예를 들어, '아동기 청소년기 청년기 장년기 노년기 주제가 있습니다! 어떤시대가 좋을까요?'처럼 답변을 생성한다.,
+                                 사용자가 주제를 요청하거나 추천받기를 원할 때 해당 객체 안에 있는 내용을 이용하여 답변을 생성한다. 예를 들어, '주제 추천해줘','무슨 얘기하지?' 등의 질문에 답변을 아래를 참고해서 생성한다.,
+                                 주제에 관한 답변을 생성할 때에는 먼저 '아동기 청소년기 청년기 장년기 노년기 주제가 있습니다! 어떤시대가 좋을까요?'로 먼저 답변을 생성한다.,
                                  마지막으로 사용자에게 특정한 연령대내부에 있는 주제들을 제공한다. 예를 들어, '청소년기의 주제에는 어떤학교에 다녔는지, 기억에 남는 친구와의 추억, 잘했던 과목, 첫사랑 등이 있습니다' 처럼 답변을 생성한다.
                                  """
                     ),
                     args_schema=EmptyArgsSchema
                     )
-    ###########
+        ###########
 
     async def get_gpt_response(self, clova_text:str):
         user_message = HumanMessage(content=clova_text)
@@ -173,13 +174,11 @@ class ReminiscenceAgent:
         self.prompt = self.create_prompt() # chat_history load
         self.agent = self._init_agent(self.tools)
         self.agent_excutor = AgentExecutor(agent=self.agent, tools=self.tools, verbose=True)
-
         response = await self.agent_excutor.ainvoke({"user_input": clova_text})
 
-        self.chat_history.append(response['output'])
-        
+        self.chat_history.append(AIMessage(response['output']))
         return response['output']
-    
+
     def return_history(self):
         return self.chat_history
 
